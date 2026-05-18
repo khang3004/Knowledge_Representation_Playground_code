@@ -24,17 +24,17 @@ CIE is structured using a clean, decoupled architecture:
 
 ```mermaid
 graph TD
-    A[User Inputs: Facts & Goal] -->|CLI / Makefile| B(Inference Engine)
-    C[knowledge_base.json] -->|Dynamic Load| B
-    B -->|Match-Resolve-Act Loop| D{Working Memory}
-    D -->|O(1) Subset Check| E[Rule Repository]
+    A["User Inputs: Facts & Goal"] -->|CLI / Makefile| B("Inference Engine")
+    C["knowledge_base.json"] -->|Dynamic Load| B
+    B -->|Match-Resolve-Act Loop| D{"Working Memory"}
+    D -->|"O(1) Subset Check"| E["Rule Repository"]
     E -->|Fired Rule| D
-    D -->|Goal Reached / Saturation| F[Execution Summary & Reaction Path]
+    D -->|"Goal Reached / Saturation"| F["Execution Summary & Reaction Path"]
 ```
 
-- **Knowledge Base:** Defines the collection of chemical reactions (production rules) at [src/knowledge_base.json](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/src/knowledge_base.json).
-- **Inference Engine:** Handles the main execution and logic at [src/engine.py](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/src/engine.py), utilizing modular `Rule` and `InferenceEngine` abstractions.
-- **CLI Entrypoint:** Provides clean parsing, logging, and user feedback at [src/main.py](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/src/main.py).
+- **Knowledge Base:** Defines the collection of chemical reactions (production rules) at [src/knowledge_base.json](src/knowledge_base.json).
+- **Inference Engine:** Handles the main execution and logic at [src/engine.py](src/engine.py), utilizing modular `Rule` and `InferenceEngine` abstractions.
+- **CLI Entrypoint:** Provides clean parsing, logging, and user feedback at [src/main.py](src/main.py).
 
 ---
 
@@ -42,7 +42,7 @@ graph TD
 
 | Expert System Concept | CIE Implementation | Technical Role / Mechanism |
 | :--- | :--- | :--- |
-| **Production Rules** | [src/knowledge_base.json](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/src/knowledge_base.json) | Declares reactions in format: $A + B \rightarrow C + D$. Instantiated as `Rule` objects with `inputs` (antecedents) and `outputs` (consequents). |
+| **Production Rules** | [src/knowledge_base.json](src/knowledge_base.json) | Declares reactions in format: $A + B \rightarrow C + D$. Instantiated as `Rule` objects with `inputs` (antecedents) and `outputs` (consequents). |
 | **Working Memory** | `known_facts: Set[str]` | An in-memory temporary store representing confirmed facts. Initialized with starting reactants (`--facts`) and updated via `.update()` when rules fire. |
 | **Conflict Resolution** | `applied_rules: List[str]` | Records fired rule IDs to ensure each chemical reaction rule is executed at most once, preventing infinite deduction loops. |
 | **Match Phase** | `rule.inputs.issubset(known_facts)` | Extremely fast, set-based matching check. Fires the reaction rules immediately when all required antecedents exist in Working Memory. |
@@ -64,4 +64,4 @@ make run
 make test
 ```
 
-*For custom simulations and detailed run instructions, refer to the [REPRODUCING.md](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/REPRODUCING.md) guide.*
+*For custom simulations and detailed run instructions, refer to the [REPRODUCING.md](REPRODUCING.md) guide.*

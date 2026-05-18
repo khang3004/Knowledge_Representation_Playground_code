@@ -42,7 +42,7 @@ To ensure long-term codebase health, readability, and maintainability:
 
 ## 3. Extending the Knowledge Base (KB)
 
-To expand chemical reaction rules within [src/knowledge_base.json](file:///Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code/src/knowledge_base.json), strictly follow this JSON layout:
+To expand chemical reaction rules within [src/knowledge_base.json](src/knowledge_base.json), strictly follow this JSON layout:
 
 ```json
 {

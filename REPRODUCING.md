@@ -16,7 +16,7 @@ This document provides step-by-step instructions to set up the environment, run 
 
 **Step 1:** Open your terminal and navigate to the project root directory:
 ```bash
-cd /Users/KhangDS/Programing/HCMUS_Code/Knowledge_Reprensentation_code/Knowledge_Rep_Playground_code
+cd CIE
 ```
 
 **Step 2:** Verify python compatibility and initialize the environment:
