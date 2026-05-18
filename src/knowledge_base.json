@@ -1,0 +1,27 @@
+[
+  {
+    "id": "r1",
+    "inputs": ["Na", "H2O"],
+    "outputs": ["NaOH", "H2"]
+  },
+  {
+    "id": "r2",
+    "inputs": ["H2", "O2"],
+    "outputs": ["H2O"]
+  },
+  {
+    "id": "r3",
+    "inputs": ["NaOH", "HCl"],
+    "outputs": ["NaCl", "H2O"]
+  },
+  {
+    "id": "r4",
+    "inputs": ["NaCl", "H2O", "NH3", "CO2"],
+    "outputs": ["NaHCO3", "NH4Cl"]
+  },
+  {
+    "id": "r5",
+    "inputs": ["NaHCO3"],
+    "outputs": ["Na2CO3", "H2O", "CO2"]
+  }
+]
