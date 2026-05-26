@@ -1,67 +1,241 @@
-# Chemical Inference Engine (CIE)
+# Omni-IPS: Omni-domain Intelligent Problem Solver
 
-CIE is a high-performance Symbolic AI Inference Engine designed to automate chemical synthesis pathway discovery and reaction routing. The system implements an optimized **Forward Chaining** algorithm over a **Rule-Based Expert System**, replacing legacy bitset parser architectures with modern set-theoretic operations for production-grade robustness.
+Omni-IPS is a production-ready, state-of-the-art **Neuro-Symbolic AI** and **GraphRAG-powered** Multi-domain Expert System. It seamlessly bridges the structural intuition of deep neural models with the absolute logical correctness of symbolic reasoning kernels.
 
-[![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Aesthetics](https://img.shields.io/badge/design-professional-brightgreen.svg)]()
+Omni-IPS is built to operate across three complex, distinct domains: **Chemistry (reactions)**, **Plane Geometry (theorems)**, and **Elementary Algebra (equations)**, using a single, unified, and entirely domain-agnostic symbolic deterministic inference core.
 
 ---
 
-## 1. Core Features
+## 1. System Architecture: A Neuro-Symbolic & GraphRAG Approach
 
-- **O(1) Fact Matching:** Leverages set-theory mathematics (`Set subset evaluation`) for the Match Phase instead of linear array traversal, reducing runtime complexity to a minimum.
-- **Dynamic Knowledge Base (KB):** Decoupled JSON-based rule storage allowing hot-reloads of reaction rules without source code modification or compilation.
-- **Goal-Directed Early Stopping:** Automatically terminates inference as soon as the target compound (Goal) is synthesized, optimizing compute resources.
-- **Zero-Dependency Architecture:** Written entirely in pure Python (Standard Library only), ensuring maximum portability across diverse execution runtimes (Cloud, Edge, Containers).
-- **Developer-Friendly Interface:** Out-of-the-box support for a clean Command Line Interface (CLI) and automated execution orchestration via `Makefile`.
-
----
-
-## 2. System Architecture
-
-CIE is structured using a clean, decoupled architecture:
+Omni-IPS decouples the semantic retrieval and mapping of rules from their formal execution, creating a highly modular and robust hybrid logical framework:
 
 ```mermaid
 graph TD
-    A["User Inputs: Facts & Goal"] -->|CLI / Makefile| B("Inference Engine")
-    C["knowledge_base.json"] -->|Dynamic Load| B
-    B -->|Match-Resolve-Act Loop| D{"Working Memory"}
-    D -->|"O(1) Subset Check"| E["Rule Repository"]
-    E -->|Fired Rule| D
-    D -->|"Goal Reached / Saturation"| F["Execution Summary & Reaction Path"]
+    A["User Natural Language Query"] -->|Natural Language| B("FastAPI Gateway & LLM Parser")
+    B -->|Semantic Retrieval / Hybrid Query| C[("Vector DB: ChromaDB")]
+    B -->|Dynamic Graph Fetch| D[("Knowledge Graph: Neo4j")]
+    C -->|Rules / Meta-data context| B
+    D -->|Logical Rule Declarations & Facts| E("Core Inference Engine (Pure Python)")
+    B -->|Goal & Initial facts mapping| E
+    E -->|Forward & Backward Chaining| E
+    E -->|Strict Execution Trace| F("Explanation Subsystem (LLM-augmented)")
+    F -->|Natural Language Proof & Explanation| G["Final Answer to User"]
 ```
 
-- **Knowledge Base:** Defines the collection of chemical reactions (production rules) at [src/knowledge_base.json](src/knowledge_base.json).
-- **Inference Engine:** Handles the main execution and logic at [src/engine.py](src/engine.py), utilizing modular `Rule` and `InferenceEngine` abstractions.
-- **CLI Entrypoint:** Provides clean parsing, logging, and user feedback at [src/main.py](src/main.py).
+### Architectural Subsystems
+
+1. **Knowledge Graph (Neo4j):**
+   * Acts as the global **Knowledge Base (KB)** storing the system's "long-term memory".
+   * **Nodes:** Represent symbolic `Fact` items (such as chemical elements, geometric angles, or algebraic expressions) and `Rule` definitions.
+   * **Edges:** Represent relationships like `:HAS_INPUT` (preconditions) and `:HAS_OUTPUT` (deductions) connecting Rules and Facts.
+   * Decoupled Architecture: All rules are dynamically loaded using optimized Cypher queries at runtime rather than being hardcoded in Python.
+
+2. **Vector Database (ChromaDB):**
+   * Stores high-dimensional semantic embeddings of natural language rule and axiom descriptions.
+   * Enables **Semantic Routing** to identify the correct domain and **GraphRAG** (Graph Retrieval-Augmented Generation) context injection to help parser agents translate unstructured queries.
+
+3. **Core Inference Engine (Pure Python):**
+   * A completely **domain-agnostic** deterministic logical reasoning kernel.
+   * Supports **Forward Chaining** (data-driven exploration to deduce everything from initial facts) and **Backward Chaining** (goal-directed proof search starting from the goal).
+   * Operates strictly on formal `Fact` and `Rule` abstractions, assuring 100% correctness and eliminating logical hallucinations.
+
+4. **FastAPI Gateway & API Layer:**
+   * Serves as the central API service orchestrating requests to the symbolic core, Neo4j connection pool, and ChromaDB vector search.
+
+5. **Docker Infrastructure:**
+   * Fully containerized and orchestrated services running isolated Neo4j instances, ChromaDB endpoints, and the Python backend in perfect sync.
 
 ---
 
-## 3. Theoretical Mapping to Implementation
+## 2. Directory Layout (Monorepo Blueprint)
 
-| Expert System Concept | CIE Implementation | Technical Role / Mechanism |
-| :--- | :--- | :--- |
-| **Production Rules** | [src/knowledge_base.json](src/knowledge_base.json) | Declares reactions in format: $A + B \rightarrow C + D$. Instantiated as `Rule` objects with `inputs` (antecedents) and `outputs` (consequents). |
-| **Working Memory** | `known_facts: Set[str]` | An in-memory temporary store representing confirmed facts. Initialized with starting reactants (`--facts`) and updated via `.update()` when rules fire. |
-| **Conflict Resolution** | `applied_rules: List[str]` | Records fired rule IDs to ensure each chemical reaction rule is executed at most once, preventing infinite deduction loops. |
-| **Match Phase** | `rule.inputs.issubset(known_facts)` | Extremely fast, set-based matching check. Fires the reaction rules immediately when all required antecedents exist in Working Memory. |
+The codebase is organized as a clean, modular monorepo utilizing Astral `uv` for lightning-fast and bulletproof dependency management:
+
+```
+Omni-IPS/
+├── docker-compose.yml          # Container orchestration (Neo4j, ChromaDB, Backend)
+├── Dockerfile                  # Production container definition (optimized with uv)
+├── pyproject.toml              # Centralized uv-based project dependencies & environment configuration
+├── uv.lock                     # Reproducible package lockfile generated by uv
+├── Makefile                    # Unified operation command panel with colored output
+├── README.md                   # Comprehensive monorepo system documentation
+├── core_engine/                # Unified symbolic engine core
+│   ├── __init__.py
+│   ├── models.py               # Pydantic validation schemas (Fact, Rule, Trace, InferenceResult)
+│   └── solver.py               # Forward & Backward chaining reasoning solvers
+├── domains/                    # Extensible domain registrations and syntax adapters
+│   ├── __init__.py
+│   ├── base.py                 # Abstract base class for DomainParser
+│   ├── chemistry/              # Chemistry domain logic
+│   │   ├── __init__.py
+│   │   └── parser.py           # Chemical formulas and balanced equations parser
+│   ├── geometry/               # Plane Geometry domain logic
+│   │   ├── __init__.py
+│   │   └── parser.py           # Axiomatic geometric theorem parser (with commutative canonicalization)
+│   └── algebra/                # Elementary Algebra domain logic
+│       ├── __init__.py
+│       └── parser.py           # Linear equations and variables parser
+├── graph_db/                   # Database driver and session managers
+│   ├── __init__.py
+│   └── connection.py           # Thread-safe Neo4j connection pool and session context manager
+├── data_pipelines/             # Real-world scientific data ingestion & ETL pipelines
+│   ├── __init__.py
+│   ├── schema.md               # Neo4j Graph database property graph schema
+│   ├── ingest_chemistry.py     # Wikidata SPARQL compound extractor + curated textbook reactions ETL
+│   └── ingest_geometry.py      # Euclid's "Elements" axioms and propositions ETL
+├── api/                        # REST Gateway API endpoints
+│   ├── __init__.py
+│   └── main.py                 # FastAPI application, CORS middlewares, and solver routes
+└── tests/                      # Core test suites
+    └── verify_scaffold.py      # Multi-domain integration verification test script
+```
 
 ---
 
-## 4. Quick Start
+## 3. Quick Start: Developing with Astral `uv`
 
-Manage and run simulations effortlessly using the provided `Makefile`:
+Astral `uv` is a blazing-fast, single-binary Python package manager written in Rust, replacing traditional `pip` and `venv` workflows.
+
+### local Prerequisites
+* Python 3.10 or higher
+* Docker and Docker Compose (optional, for full DB orchestration)
+* `uv` Package Manager (automatically installed if missing during `make setup`)
+
+### 1. Project Initialization & Setup
+Run the unified setup command. This validates/installs `uv`, initializes a virtual environment in `.venv/`, and installs all production and development dependencies:
 
 ```bash
-# Verify environment compatibility
 make setup
+```
 
-# Run default single-step synthesis (Na + H2O -> NaOH)
-make run
+### 2. Run Monorepo Integration Tests
+Verify that the core symbolic solvers (Forward and Backward chaining) and domain parsers (Chemistry, Geometry, and Algebra) function perfectly:
 
-# Run multi-step chain synthesis (Na + H2O + HCl -> NaCl)
+```bash
 make test
 ```
 
-*For custom simulations and detailed run instructions, refer to the [REPRODUCING.md](REPRODUCING.md) guide.*
+### 3. Run Local Development Server
+Spin up the FastAPI Gateway API locally. The server automatically reload changes in code:
+
+```bash
+make run-server
+```
+
+Once started, the interactive OpenAPI documentation is available at:
+* **Interactive API docs:** [http://localhost:8080/docs](http://localhost:8080/docs)
+* **Health endpoint:** [http://localhost:8080/health](http://localhost:8080/health)
+
+---
+
+## 4. Operational Ingestion & ETL Pipelines (Phase 2)
+
+Omni-IPS prohibits the use of synthetic data generators to prevent hallucinations in rigorous mathematical and chemical reasoning. Instead, real data is ingested via dedicated, robust ETL pipelines:
+
+### 1. Ingestion Pipelines Command Reference
+
+* **Ingest Chemistry Data:** Extract chemical compounds from Wikidata via live SPARQL queries and merge with 20 IUPAC/textbook-verified reactions into Neo4j:
+  ```bash
+  make ingest-chemistry
+  ```
+* **Ingest Geometry Data:** Populate the database with 16 fundamental Euclidean plane geometry axioms and theorems (Euclid's Postulates, SAS/ASA/SSS congruence criteria, Pythagorean theorem, Thales's theorem):
+  ```bash
+  make ingest-geometry
+  ```
+* **Ingest All Data:** Populate both domains with a single command:
+  ```bash
+  make ingest-all
+  ```
+
+### 2. Validation & Dry Runs (No Neo4j Needed)
+Validate the extraction and transformation stages of the pipelines without having a live Neo4j instance running:
+
+```bash
+# Validate chemistry data pipelines
+make ingest-chemistry-dry
+
+# Validate geometry data pipelines
+make ingest-geometry-dry
+```
+
+---
+
+## 5. Docker Orchestration
+
+The entire infrastructure (Neo4j, ChromaDB, and Python FastAPI backend) is fully containerized for one-click deployment.
+
+### 1. Launch Containerized Services
+To build and spin up the databases and backend service:
+
+```bash
+make docker-up
+```
+
+This starts:
+* **Neo4j Graph Database:** [http://localhost:7474](http://localhost:7474) (Credentials: `neo4j` / `omni_ips_password`)
+* **Chroma Vector DB:** [http://localhost:8000](http://localhost:8000)
+* **FastAPI Backend Service:** [http://localhost:8080](http://localhost:8080)
+
+### 2. Inspecting and Monitoring
+* **View Container Status:** `make docker-status`
+* **Tail Service Logs:** `make docker-logs`
+* **Stop Services:** `make docker-down`
+
+---
+
+## 6. API Interface Specification
+
+The FastAPI gateway exposes clear endpoints for triggering problem solving and fetching database states.
+
+### `POST /solve` (Execute Inference Solver)
+Deduce a solution pathway using Forward or Backward chaining.
+
+#### Request Example (Chemistry Forward Chaining)
+```json
+{
+  "domain": "chemistry",
+  "facts": ["Na", "H2O", "HCl"],
+  "goal": "NaCl",
+  "strategy": "forward"
+}
+```
+
+#### Response Example
+```json
+{
+  "goal_reached": true,
+  "applied_rule_ids": ["r1", "r3"],
+  "execution_trace": [
+    {
+      "rule_id": "r1",
+      "fired_rule_repr": "r1 [Sodium Hydration]: Na + H2O -> NaOH + H2",
+      "new_facts": ["NaOH", "H2"]
+    },
+    {
+      "rule_id": "r3",
+      "fired_rule_repr": "r3 [Neutralization]: NaOH + HCl -> NaCl + H2O",
+      "new_facts": ["NaCl"]
+    }
+  ],
+  "known_facts": ["H2", "H2O", "HCl", "Na", "NaCl", "NaOH"]
+}
+```
+
+### `GET /rules`
+Fetch all registered rules inside Neo4j, filtered optionally by domain.
+```bash
+curl "http://localhost:8080/rules?domain=geometry"
+```
+
+---
+
+## 7. Clean Coding, SOLID & Design Patterns
+
+Omni-IPS is engineered in accordance with strict **SOLID design principles**:
+
+* **Single Responsibility Principle (SRP):** The `core_engine/solver.py` is entirely separated from domain-specific notation. Solvers are only responsible for executing logical chaining, while domain parsers manage domain syntax validation.
+* **Open/Closed Principle (OCP):** Adding a new reasoning domain (e.g., Classical Physics, Thermodynamics) requires zero modifications to the core engine. Simply sub-class the `DomainParser` abstract base class and register the new parser inside `domains/`.
+* **Liskov Substitution Principle (LSP):** All domain parsers extend from `DomainParser` and can be utilized interchangeably by downstream query engines.
+* **Interface Segregation Principle (ISP):** Domain-specific values (e.g., molecular masses in chemistry, coordinate points in geometry) are kept inside the dynamic and extensible `attributes` dictionary of the Pydantic `Fact` class, keeping the central interfaces lightweight.
+* **Dependency Inversion Principle (DIP):** Reasoning engines and data models communicate strictly through abstract model schemas (`Fact`, `Rule`), keeping them decoupled from low-level database operations.

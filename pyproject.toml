@@ -1,0 +1,24 @@
+[project]
+name = "omni-ips"
+version = "0.1.0"
+description = "Omni-domain Intelligent Problem Solver (Omni-IPS) - Neuro-Symbolic & GraphRAG Expert System"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5.0",
+    "neo4j>=5.14.0",
+    "chromadb>=0.4.15",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "typing-extensions>=4.7.0",
+    "SPARQLWrapper>=2.0.0",
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.10",
+    "langchain-openai>=0.1.0",
+]
+
+[tool.uv]
+package = false
+dev-dependencies = [
+    "pytest>=7.0.0",
+]
