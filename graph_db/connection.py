@@ -9,6 +9,10 @@ import os
 import logging
 from contextlib import contextmanager
 from typing import Optional, Generator
+from dotenv import load_dotenv
+
+# Load local environment configurations from .env
+load_dotenv()
 
 from neo4j import GraphDatabase, Driver, Session
 

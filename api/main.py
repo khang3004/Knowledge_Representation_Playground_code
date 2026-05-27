@@ -1,5 +1,9 @@
 import os
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from typing import List, Optional
 from pydantic import BaseModel, Field
 

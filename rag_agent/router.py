@@ -11,6 +11,10 @@ import sys
 import re
 import logging
 from typing import List, Dict, Any, Tuple, Optional
+from dotenv import load_dotenv
+
+# Load local environment configurations from .env
+load_dotenv()
 
 # Add project root to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
