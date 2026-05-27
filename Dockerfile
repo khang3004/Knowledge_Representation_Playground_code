@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.9 /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install compilation tools needed for C dependencies (e.g. chromadb, greenlet, etc.)
+# Install compilation tools needed for C dependencies (e.g. greenlet, sentence-transformers, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*

@@ -11,13 +11,12 @@ class ChemistryParser(DomainParser):
         return "chemistry"
 
     def parse_fact(self, raw_input: str, fact_id: str) -> Fact:
-        # Standardizing raw compound representation (e.g., stripping spaces)
         cleaned = raw_input.strip()
         return Fact(
             id=fact_id,
             value=cleaned,
             domain=self.domain_name,
-            attributes={"molecular_weight": None} # Extendable
+            attributes={"molecular_weight": None}
         )
 
     def parse_rule(self, raw_rule: dict) -> Rule:

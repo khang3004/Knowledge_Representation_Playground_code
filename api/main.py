@@ -77,8 +77,8 @@ class SolveQueryRequest(BaseModel):
 class SolveQueryResponse(BaseModel):
     query: str = Field(..., description="Original natural language query.")
     domain: str = Field(..., description="Target domain.")
-    mapped_initial_facts: List[str] = Field(..., description="Semantic facts mapped from ChromaDB.")
-    mapped_goal: str = Field(..., description="Semantic goal mapped from ChromaDB.")
+    mapped_initial_facts: List[str] = Field(..., description="Semantic facts mapped from Qdrant.")
+    mapped_goal: str = Field(..., description="Semantic goal mapped from Qdrant.")
     goal_reached: bool = Field(..., description="Whether the goal was reached.")
     applied_rule_ids: List[str] = Field(..., description="Sequence of fired rule IDs.")
     execution_trace: List[ExecutionStepResponse] = Field(..., description="Formal proof steps.")
@@ -111,8 +111,8 @@ async def health_check():
         "neo4j_connected": db_connected,
         "environment": {
             "neo4j_uri": os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-            "chromadb_host": os.getenv("CHROMADB_HOST", "localhost"),
-            "chromadb_port": os.getenv("CHROMADB_PORT", "8000")
+            "qdrant_host": os.getenv("QDRANT_HOST", "localhost"),
+            "qdrant_port": os.getenv("QDRANT_PORT", "6333")
         }
     }
 
@@ -231,7 +231,7 @@ async def solve_query(request: SolveQueryRequest):
     parser = PARSERS[domain]
     
     try:
-        # Step 1: Run the Neuro-Symbolic Router (NLP -> ChromaDB -> Neo4j Nodes)
+        # Step 1: Run the Neuro-Symbolic Router (NLP -> Qdrant -> Neo4j Nodes)
         logger.info("Routing query: '%s' in domain '%s'", request.query, domain)
         initial_facts, goal_fact = route_query(request.query, domain)
         

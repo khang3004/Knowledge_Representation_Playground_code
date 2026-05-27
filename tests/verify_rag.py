@@ -18,7 +18,7 @@ import asyncio
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rag_agent.router import route_query, fallback_query_parser
-from rag_agent.embed_knowledge import get_neo4j_facts_and_rules, ingest_to_chroma
+from rag_agent.embed_knowledge import get_neo4j_facts_and_rules, ingest_to_qdrant
 from core_engine import ForwardChainingEngine
 from core_engine.models import Fact
 from api.main import explain_proof, ExplainRequest, ExecutionStepResponse
@@ -55,8 +55,8 @@ def test_offline_query_parsing():
     print("✅ NLP Parser Verification Passed.")
 
 
-def test_chroma_embedding_and_routing():
-    print("\n--- Test 2: Ingestion & ChromaDB Semantic Routing ---")
+def test_qdrant_embedding_and_routing():
+    print("\n--- Test 2: Ingestion & Qdrant Semantic Routing ---")
     
     # 1. Fetch from Neo4j (will run or use fallbacks if Neo4j is blank)
     try:
@@ -74,9 +74,9 @@ def test_chroma_embedding_and_routing():
             {"id": "r1", "name": "Sodium Hydration", "domain": "chemistry", "description": "Sodium reacting with water.", "source": "Textbook"}
         ]
         
-    # 2. Ingest to Chroma
-    print("Synchronizing vectors in ChromaDB...")
-    ingest_to_chroma(facts, rules)
+    # 2. Ingest to Qdrant
+    print("Synchronizing vectors in Qdrant...")
+    ingest_to_qdrant(facts, rules)
     
     # 3. Route Query
     print("\nExecuting routing search for: 'I have sodium and water, how do I make sodium hydroxide?'")
@@ -92,7 +92,7 @@ def test_chroma_embedding_and_routing():
     assert any(f.value == "H2O" for f in mapped_facts), "Failed to semantically map 'water' to graph node 'H2O'"
     assert mapped_goal.value == "NaOH", "Failed to semantically map 'sodium hydroxide' to graph goal 'NaOH'"
     
-    print("✅ ChromaDB Semantic Routing Verification Passed.")
+    print("✅ Qdrant Semantic Routing Verification Passed.")
 
 
 def test_full_neuro_symbolic_solving_and_explanation():
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     print("==================================================")
     try:
         test_offline_query_parsing()
-        test_chroma_embedding_and_routing()
+        test_qdrant_embedding_and_routing()
         # Only run solver integration if we succeeded mapping (needs active containers)
         test_full_neuro_symbolic_solving_and_explanation()
         print("\n🎉 ALL PHASE 3 INTEGRATION AND GRAPHRAG PIPELINE TESTS PASSED SUCCESSFULLY!")

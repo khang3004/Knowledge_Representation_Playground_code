@@ -5,7 +5,7 @@
 # Powered by Astral 'uv' Package Manager & Docker Containerization
 # ==============================================================================
 
-.PHONY: help setup test test-rag ingest-chemistry ingest-geometry ingest-chemistry-dry ingest-geometry-dry ingest-chemistry-fast ingest-all ingest-all-fast embed-knowledge docker-up docker-down docker-logs docker-status run-server run-legacy-demo clean
+.PHONY: help setup test test-rag ingest-chemistry ingest-geometry ingest-chemistry-dry ingest-geometry-dry ingest-chemistry-fast ingest-all ingest-all-fast embed-knowledge docker-up docker-down docker-logs docker-status run-server run-ui run-legacy-demo clean
 
 # Shell Configuration
 SHELL := /bin/bash
@@ -43,22 +43,23 @@ help:
 	@echo -e "  $(COLOR_CYAN)make test$(COLOR_RESET)                 - Run the multi-domain symbolic engine verification tests"
 	@echo -e "  $(COLOR_CYAN)make test-rag$(COLOR_RESET)             - Run the GraphRAG pipeline and explainability agent verification tests"
 	@echo -e ""
-	@echo -e "$(COLOR_BOLD)3. ETL Pipelines & Ingestion (Neo4j & ChromaDB):$(COLOR_RESET)"
+	@echo -e "$(COLOR_BOLD)3. ETL Pipelines & Ingestion (Neo4j & Qdrant):$(COLOR_RESET)"
 	@echo -e "  $(COLOR_CYAN)make ingest-chemistry$(COLOR_RESET)     - Extract from Wikidata + ingest 20 textbook reactions into Neo4j"
 	@echo -e "  $(COLOR_CYAN)make ingest-chemistry-fast$(COLOR_RESET)- Ingest chemistry data immediately, skipping Wikidata SPARQL extraction"
 	@echo -e "  $(COLOR_CYAN)make ingest-geometry$(COLOR_RESET)      - Ingest 16 Euclidean axioms and theorems into Neo4j"
 	@echo -e "  $(COLOR_CYAN)make ingest-all$(COLOR_RESET)           - Run both chemistry and geometry ETL ingestion pipelines"
 	@echo -e "  $(COLOR_CYAN)make ingest-all-fast$(COLOR_RESET)      - Run both chemistry (fast) and geometry ETL ingestion pipelines"
-	@echo -e "  $(COLOR_CYAN)make embed-knowledge$(COLOR_RESET)      - Generate local embeddings and populate ChromaDB from Neo4j nodes"
+	@echo -e "  $(COLOR_CYAN)make embed-knowledge$(COLOR_RESET)      - Generate local embeddings and populate Qdrant from Neo4j nodes"
 	@echo -e "  $(COLOR_CYAN)make ingest-chemistry-dry$(COLOR_RESET) - Run chemistry ETL in validation (Dry Run) mode without Neo4j"
 	@echo -e "  $(COLOR_CYAN)make ingest-geometry-dry$(COLOR_RESET)  - Run geometry ETL in validation (Dry Run) mode without Neo4j"
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)4. API Server & Execution:$(COLOR_RESET)"
 	@echo -e "  $(COLOR_CYAN)make run-server$(COLOR_RESET)           - Launch FastAPI Gateway locally (Port: $(PORT), Host: $(HOST))"
+	@echo -e "  $(COLOR_CYAN)make run-ui$(COLOR_RESET)               - Launch Streamlit Chat UI locally (Port: 8501)"
 	@echo -e "  $(COLOR_CYAN)make run-legacy-demo$(COLOR_RESET)      - Run legacy forward-chaining CLI demo (Na + H2O -> NaOH)"
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)5. Docker Infrastructure:$(COLOR_RESET)"
-	@echo -e "  $(COLOR_CYAN)make docker-up$(COLOR_RESET)            - Build and launch Neo4j, ChromaDB, and Backend containers"
+	@echo -e "  $(COLOR_CYAN)make docker-up$(COLOR_RESET)            - Build and launch Neo4j, Qdrant, Backend, and Frontend containers"
 	@echo -e "  $(COLOR_CYAN)make docker-down$(COLOR_RESET)          - Shut down docker compose services and release ports"
 	@echo -e "  $(COLOR_CYAN)make docker-status$(COLOR_RESET)        - View status of docker compose services"
 	@echo -e "  $(COLOR_CYAN)make docker-logs$(COLOR_RESET)          - Tail live logs from all docker compose containers"
@@ -116,24 +117,29 @@ ingest-all-fast:
 	@echo -e "$(COLOR_GREEN)[Omni-IPS] All fast ETL pipelines executed successfully. Databases populated.$(COLOR_RESET)"
 
 embed-knowledge:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Populating Chroma Vector Database from Neo4j Knowledge Graph...$(COLOR_RESET)"
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Populating Qdrant Vector Database from Neo4j Knowledge Graph...$(COLOR_RESET)"
 	@uv run python rag_agent/embed_knowledge.py
 
 run-server:
 	@echo -e "$(COLOR_BLUE)[Omni-IPS] Launching local FastAPI Gateway server at http://$(HOST):$(PORT)...$(COLOR_RESET)"
 	@uv run uvicorn api.main:app --reload --host $(HOST) --port $(PORT)
 
+run-ui:
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Launching Streamlit Chat UI at http://localhost:8501...$(COLOR_RESET)"
+	@uv run streamlit run ui/app.py --server.port 8501
+
 run-legacy-demo:
 	@echo -e "$(COLOR_BLUE)[Omni-IPS] Executing legacy forward chaining CLI logic...$(COLOR_RESET)"
 	@uv run python src/main.py --kb src/knowledge_base.json --facts Na H2O --goal NaOH
 
 docker-up:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] orchestrating containerized infrastructure (Neo4j + ChromaDB + Backend)...$(COLOR_RESET)"
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] orchestrating containerized infrastructure (Neo4j + Qdrant + Backend + Frontend)...$(COLOR_RESET)"
 	docker compose up --build -d
 	@echo -e "$(COLOR_GREEN)[Omni-IPS] Infrastructure successfully launched.$(COLOR_RESET)"
-	@echo -e "  - Neo4j Browser: http://localhost:7474 (user: neo4j / pass: omni_ips_password)"
-	@echo -e "  - FastAPI docs:  http://localhost:8080/docs"
-	@echo -e "  - ChromaDB host: http://localhost:8000"
+	@echo -e "  - Neo4j Browser:    http://localhost:7474 (user: neo4j / pass: omni_ips_password)"
+	@echo -e "  - FastAPI docs:     http://localhost:8080/docs"
+	@echo -e "  - Qdrant Dashboard: http://localhost:6333/dashboard"
+	@echo -e "  - Streamlit UI:     http://localhost:8501"
 
 docker-down:
 	@echo -e "$(COLOR_BLUE)[Omni-IPS] Shutting down docker infrastructure...$(COLOR_RESET)"

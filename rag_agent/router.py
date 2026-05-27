@@ -3,12 +3,13 @@ Neuro-Symbolic Router for Omni-IPS.
 
 Bridges Natural Language queries with the Symbolic Core Engine by:
 1. Parsing queries into structured Facts and Goals (via LangChain LLM or regex fallback).
-2. Semantically mapping those text entities to exact Neo4j Fact nodes using ChromaDB vector search.
+2. Semantically mapping those text entities to exact Neo4j Fact nodes using Qdrant vector search.
 """
 
 import os
 import sys
 import re
+import time
 import logging
 from typing import List, Dict, Any, Tuple, Optional
 from dotenv import load_dotenv
@@ -19,7 +20,9 @@ load_dotenv()
 # Add project root to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import chromadb
+from qdrant_client import QdrantClient
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+from sentence_transformers import SentenceTransformer
 from core_engine.models import Fact
 from graph_db.connection import Neo4jConnection
 
@@ -28,6 +31,18 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("rag_router")
+
+# Load embedding model once at module level for performance
+_embedding_model: Optional[SentenceTransformer] = None
+
+def _get_embedding_model() -> SentenceTransformer:
+    """Lazily loads and caches the SentenceTransformer embedding model."""
+    global _embedding_model
+    if _embedding_model is None:
+        logger.info("Loading SentenceTransformer embedding model 'all-MiniLM-L6-v2'...")
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedding_model
+
 
 # Standard Chemistry Natural Language to Formula mapping lookup
 CHEM_DICTIONARY = {
@@ -181,7 +196,7 @@ def fallback_query_parser(query: str, domain: str) -> Tuple[List[str], str]:
 
     elif domain == "algebra":
         # Extract equations containing '=' or mathematical terms
-        eq_regex = r"\b[a-zA-Z0-9\+\-\*\/\s]+=[a-zA-Z0-9\+\-\*\/\s]+\b"
+        eq_regex = r"\b[a-zA-Z0-9\+\-\*\/\s]+=[ a-zA-Z0-9\+\-\*\/\s]+\b"
         raw_eqs = re.findall(eq_regex, query)
         for eq in raw_eqs:
             cleaned_eq = re.sub(r"\s+", "", eq)
@@ -272,40 +287,55 @@ def llm_query_parser(query: str, domain: str) -> Tuple[List[str], str]:
 def map_text_to_graph_fact(
     text: str, 
     domain: str, 
-    chroma_collection: chromadb.Collection
+    qdrant_client: QdrantClient,
+    collection_name: str = "omni_ips_facts"
 ) -> Fact:
     """
-    Queries ChromaDB to find the most semantically matching Fact node in Neo4j.
+    Queries Qdrant to find the most semantically matching Fact node in Neo4j.
+    Uses hard-filtering on the domain payload property for instant branch pruning.
     If no match is found or database is unreachable, constructs a temporary Fact object.
     """
     domain = domain.lower()
     try:
-        # Query vector store
-        results = chroma_collection.query(
-            query_texts=[text],
-            n_results=1,
-            where={"domain": domain}
+        # Encode query text
+        model = _get_embedding_model()
+        query_vector = model.encode(text).tolist()
+
+        # Query Qdrant with hard-filtering on domain
+        results = qdrant_client.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="domain",
+                        match=MatchValue(value=domain)
+                    )
+                ]
+            ),
+            limit=1
         )
 
-        if results and results["metadatas"] and results["metadatas"][0]:
-            match_meta = results["metadatas"][0][0]
-            score = results["distances"][0][0] if results["distances"] else 0.0
+        if results.points:
+            match = results.points[0]
+            score = match.score
+            payload = match.payload
 
-            # Distance threshold: Chroma default cosine distance (lower is closer, 0.0 is exact)
-            # Typically anything below 0.6 is a decent match for MiniLM
-            if score < 0.6:
+            # Score threshold: Qdrant cosine similarity (higher is closer, 1.0 is exact)
+            # Threshold of 0.4 provides good matching quality for MiniLM embeddings
+            if score >= 0.4:
                 logger.info(
-                    "Mapped '%s' to Graph Fact '%s' (value='%s') with cosine distance %0.4f", 
-                    text, match_meta["label"], match_meta["value"], score
+                    "Mapped '%s' to Graph Fact '%s' (value='%s') with cosine similarity %0.4f", 
+                    text, payload.get("label", ""), payload.get("value", ""), score
                 )
                 return Fact(
-                    id=match_meta["neo4j_id"],
-                    value=match_meta["value"],
+                    id=payload["neo4j_id"],
+                    value=payload["value"],
                     domain=domain
                 )
 
     except Exception as e:
-        logger.warning("ChromaDB matching failed for text '%s': %s. Creating ad-hoc fact.", text, e)
+        logger.warning("Qdrant matching failed for text '%s': %s. Creating ad-hoc fact.", text, e)
 
     # Ad-hoc Fallback: Construct Fact dynamically
     # Use standard lookup dictionary first
@@ -324,36 +354,44 @@ def map_text_to_graph_fact(
 def route_query(query: str, domain: str) -> Tuple[List[Fact], Fact]:
     """
     Entrypoint for the Neuro-Symbolic Router.
-    Parses natural language query, maps entities via ChromaDB, and returns Fact nodes.
+    Parses natural language query, maps entities via Qdrant, and returns Fact nodes.
     """
     domain = domain.lower()
     
     # 1. Parse text query into structured text concepts
     facts_text, goal_text = llm_query_parser(query, domain)
 
-    # 2. Establish connection to ChromaDB
-    chroma_host = os.getenv("CHROMADB_HOST", "localhost")
-    chroma_port = int(os.getenv("CHROMADB_PORT", 8000))
+    # 2. Establish connection to Qdrant with retry
+    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+    qdrant_port = int(os.getenv("QDRANT_PORT", 6333))
     
-    facts_collection = None
-    try:
-        chroma_client = chromadb.HttpClient(host=chroma_host, port=str(chroma_port))
-        facts_collection = chroma_client.get_collection("omni_ips_facts")
-    except Exception as e:
-        logger.warning("Could not connect to ChromaDB at %s:%d: %s. Using ad-hoc routing.", chroma_host, chroma_port, e)
+    qdrant = None
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            qdrant = QdrantClient(host=qdrant_host, port=qdrant_port)
+            qdrant.get_collections()
+            break
+        except Exception as e:
+            if attempt == max_retries:
+                logger.warning("Could not connect to Qdrant at %s:%d after %d attempts: %s. Using ad-hoc routing.",
+                               qdrant_host, qdrant_port, max_retries, e)
+                qdrant = None
+            else:
+                time.sleep(1.0 * attempt)
 
     # 3. Map parsed text elements to formal Fact objects
     mapped_facts = []
     for f_text in facts_text:
-        if facts_collection:
-            mapped_facts.append(map_text_to_graph_fact(f_text, domain, facts_collection))
+        if qdrant:
+            mapped_facts.append(map_text_to_graph_fact(f_text, domain, qdrant))
         else:
             # Offline fallback
             val = CHEM_DICTIONARY.get(f_text.lower(), f_text) if domain == "chemistry" else f_text
             mapped_facts.append(Fact(id=f"adhoc_{domain}_{abs(hash(val))}", value=val, domain=domain))
 
-    if facts_collection and goal_text:
-        mapped_goal = map_text_to_graph_fact(goal_text, domain, facts_collection)
+    if qdrant and goal_text:
+        mapped_goal = map_text_to_graph_fact(goal_text, domain, qdrant)
     else:
         val = CHEM_DICTIONARY.get(goal_text.lower(), goal_text) if domain == "chemistry" and goal_text else goal_text
         mapped_goal = Fact(id=f"adhoc_{domain}_{abs(hash(val))}", value=val, domain=domain)

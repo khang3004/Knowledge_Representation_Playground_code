@@ -4,7 +4,7 @@ from core_engine.models import Fact, Rule
 class AlgebraParser(DomainParser):
     """
     Concrete syntax parser for Elementary Algebra.
-    Parses equations, operations, and variables like x + 2 = 5 or Solve(x).
+    Parses equations, operations, and variables like x + 2 = 5, Equiv(x+2, 5), or Solve(x).
     """
     @property
     def domain_name(self) -> str:
@@ -13,11 +13,21 @@ class AlgebraParser(DomainParser):
     def parse_fact(self, raw_input: str, fact_id: str) -> Fact:
         cleaned = raw_input.replace(" ", "")
         attributes = {}
+        
         if "=" in cleaned:
             parts = cleaned.split("=")
             attributes["lhs"] = parts[0]
             attributes["rhs"] = parts[1]
             attributes["is_equation"] = True
+        elif cleaned.startswith("Equiv(") and cleaned.endswith(")"):
+            content = cleaned[6:-1]
+            parts = content.split(",")
+            if len(parts) == 2:
+                attributes["lhs"] = parts[0].strip()
+                attributes["rhs"] = parts[1].strip()
+                attributes["is_equation"] = True
+            else:
+                attributes["is_equation"] = False
         else:
             attributes["is_equation"] = False
 
