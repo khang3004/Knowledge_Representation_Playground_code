@@ -5,7 +5,7 @@
 # Powered by Astral 'uv' Package Manager & Docker Containerization
 # ==============================================================================
 
-.PHONY: help setup test test-rag ingest-chemistry ingest-geometry ingest-chemistry-dry ingest-geometry-dry ingest-chemistry-fast ingest-all ingest-all-fast embed-knowledge docker-up docker-down docker-logs docker-status run-server run-ui run-legacy-demo clean
+.PHONY: help setup setup-schema test test-rag ingest-chemistry ingest-geometry ingest-algebra ingest-all embed-knowledge docker-up docker-down docker-logs docker-status run-server run-ui run-legacy-demo clean
 
 # Shell Configuration
 SHELL := /bin/bash
@@ -37,6 +37,7 @@ help:
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)1. Setup & Package Management:$(COLOR_RESET)"
 	@echo -e "  $(COLOR_CYAN)make setup$(COLOR_RESET)                - Install dependencies & synchronize virtual environment (.venv) using uv"
+	@echo -e "  $(COLOR_CYAN)make setup-schema$(COLOR_RESET)         - Initialize Neo4j constraints and Qdrant collections"
 	@echo -e "  $(COLOR_CYAN)make clean$(COLOR_RESET)                - Remove cached files, pycache, and virtual environment"
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)2. Testing & Verification:$(COLOR_RESET)"
@@ -44,14 +45,11 @@ help:
 	@echo -e "  $(COLOR_CYAN)make test-rag$(COLOR_RESET)             - Run the GraphRAG pipeline and explainability agent verification tests"
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)3. ETL Pipelines & Ingestion (Neo4j & Qdrant):$(COLOR_RESET)"
-	@echo -e "  $(COLOR_CYAN)make ingest-chemistry$(COLOR_RESET)     - Extract from Wikidata + ingest 20 textbook reactions into Neo4j"
-	@echo -e "  $(COLOR_CYAN)make ingest-chemistry-fast$(COLOR_RESET)- Ingest chemistry data immediately, skipping Wikidata SPARQL extraction"
-	@echo -e "  $(COLOR_CYAN)make ingest-geometry$(COLOR_RESET)      - Ingest 16 Euclidean axioms and theorems into Neo4j"
-	@echo -e "  $(COLOR_CYAN)make ingest-all$(COLOR_RESET)           - Run both chemistry and geometry ETL ingestion pipelines"
-	@echo -e "  $(COLOR_CYAN)make ingest-all-fast$(COLOR_RESET)      - Run both chemistry (fast) and geometry ETL ingestion pipelines"
-	@echo -e "  $(COLOR_CYAN)make embed-knowledge$(COLOR_RESET)      - Generate local embeddings and populate Qdrant from Neo4j nodes"
-	@echo -e "  $(COLOR_CYAN)make ingest-chemistry-dry$(COLOR_RESET) - Run chemistry ETL in validation (Dry Run) mode without Neo4j"
-	@echo -e "  $(COLOR_CYAN)make ingest-geometry-dry$(COLOR_RESET)  - Run geometry ETL in validation (Dry Run) mode without Neo4j"
+	@echo -e "  $(COLOR_CYAN)make ingest-chemistry$(COLOR_RESET)     - Extract from Wikidata (Massive) + ingest into Neo4j/Qdrant"
+	@echo -e "  $(COLOR_CYAN)make ingest-geometry$(COLOR_RESET)      - Ingest Axiomatic Euclidean geometry theorems into Neo4j/Qdrant"
+	@echo -e "  $(COLOR_CYAN)make ingest-algebra$(COLOR_RESET)       - Ingest Algebraic axioms and properties into Neo4j/Qdrant"
+	@echo -e "  $(COLOR_CYAN)make ingest-all$(COLOR_RESET)           - Run Chemistry, Geometry, and Algebra ETL ingestion pipelines"
+	@echo -e "  $(COLOR_CYAN)make embed-knowledge$(COLOR_RESET)      - Populate Qdrant Vector Database from Neo4j (Legacy Support)"
 	@echo -e ""
 	@echo -e "$(COLOR_BOLD)4. API Server & Execution:$(COLOR_RESET)"
 	@echo -e "  $(COLOR_CYAN)make run-server$(COLOR_RESET)           - Launch FastAPI Gateway locally (Port: $(PORT), Host: $(HOST))"
@@ -76,6 +74,10 @@ setup:
 	@uv sync
 	@echo -e "$(COLOR_GREEN)[Omni-IPS] Setup complete. Virtual environment ready in '.venv/'.$(COLOR_RESET)"
 
+setup-schema:
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Initializing database schema and collections...$(COLOR_RESET)"
+	@uv run python data_pipelines/setup_schema.py
+
 test:
 	@echo -e "$(COLOR_BLUE)[Omni-IPS] Running multi-domain integration & verification tests...$(COLOR_RESET)"
 	@uv run python tests/verify_scaffold.py
@@ -85,36 +87,24 @@ test-rag:
 	@uv run python tests/verify_rag.py
 
 ingest-chemistry:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Chemistry ETL pipeline (Wikidata SPARQL + Curated Ingestion)...$(COLOR_RESET)"
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Chemistry ETL pipeline (Mass Extraction)...$(COLOR_RESET)"
 	@uv run python data_pipelines/ingest_chemistry.py
-
-ingest-chemistry-dry:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Running Chemistry ETL pipeline in DRY RUN validation mode...$(COLOR_RESET)"
-	@uv run python data_pipelines/ingest_chemistry.py --dry-run
 
 ingest-geometry:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Geometry ETL pipeline (Euclidean Axioms Ingestion)...$(COLOR_RESET)"
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Geometry ETL pipeline (Euclidean Axioms)...$(COLOR_RESET)"
 	@uv run python data_pipelines/ingest_geometry.py
 
-ingest-geometry-dry:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Running Geometry ETL pipeline in DRY RUN validation mode...$(COLOR_RESET)"
-	@uv run python data_pipelines/ingest_geometry.py --dry-run
-
-ingest-chemistry-fast:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Chemistry FAST ETL pipeline (skipping SPARQL)...$(COLOR_RESET)"
-	@uv run python data_pipelines/ingest_chemistry.py --skip-sparql
+ingest-algebra:
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Starting Algebra ETL pipeline (Algebraic Axioms)...$(COLOR_RESET)"
+	@uv run python data_pipelines/ingest_algebra.py
 
 ingest-all:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Triggering comprehensive database ingestion (Chemistry + Geometry)...$(COLOR_RESET)"
+	@echo -e "$(COLOR_BLUE)[Omni-IPS] Triggering comprehensive database ingestion (Chem + Geo + Alg)...$(COLOR_RESET)"
+	@uv run python data_pipelines/setup_schema.py
 	@uv run python data_pipelines/ingest_chemistry.py
 	@uv run python data_pipelines/ingest_geometry.py
+	@uv run python data_pipelines/ingest_algebra.py
 	@echo -e "$(COLOR_GREEN)[Omni-IPS] All ETL pipelines executed successfully. Databases populated.$(COLOR_RESET)"
-
-ingest-all-fast:
-	@echo -e "$(COLOR_BLUE)[Omni-IPS] Triggering comprehensive FAST database ingestion (Chemistry FAST + Geometry)...$(COLOR_RESET)"
-	@uv run python data_pipelines/ingest_chemistry.py --skip-sparql
-	@uv run python data_pipelines/ingest_geometry.py
-	@echo -e "$(COLOR_GREEN)[Omni-IPS] All fast ETL pipelines executed successfully. Databases populated.$(COLOR_RESET)"
 
 embed-knowledge:
 	@echo -e "$(COLOR_BLUE)[Omni-IPS] Populating Qdrant Vector Database from Neo4j Knowledge Graph...$(COLOR_RESET)"

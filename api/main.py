@@ -144,8 +144,12 @@ async def solve_problem(request: SolveRequest):
                 with db_conn.get_session() as session:
                     result = session.run(
                         "MATCH (r:Rule) WHERE r.domain = $domain "
-                        "RETURN r.id AS id, r.name AS name, r.inputs AS inputs, "
-                        "r.outputs AS outputs, r.description AS description",
+                        "OPTIONAL MATCH (f_in:Fact)-[:HAS_INPUT]->(r) "
+                        "OPTIONAL MATCH (r)-[:HAS_OUTPUT]->(f_out:Fact) "
+                        "WITH r, "
+                        "     CASE WHEN r.inputs IS NOT NULL THEN r.inputs ELSE collect(DISTINCT f_in.value) END AS inputs, "
+                        "     CASE WHEN r.outputs IS NOT NULL THEN r.outputs ELSE collect(DISTINCT f_out.value) END AS outputs "
+                        "RETURN r.id AS id, r.name AS name, inputs, outputs, r.description AS description",
                         domain=domain
                     )
                     raw_rules = []
@@ -153,16 +157,16 @@ async def solve_problem(request: SolveRequest):
                         raw_rules.append({
                             "id": record["id"],
                             "name": record["name"],
-                            "inputs": record["inputs"],
-                            "outputs": record["outputs"],
-                            "description": record["description"]
+                            "inputs": record["inputs"] or [],
+                            "outputs": record["outputs"] or [],
+                            "description": record["description"] or ""
                         })
                     
                     rules = [parser.parse_rule(r) for r in raw_rules]
                     logger.info("Loaded %d rules from Neo4j for domain '%s'", len(rules), domain)
             db_conn.close()
         except Exception as db_err:
-            logger.warning("Failed to fetch rules from Neo4j, falling back to mock: %s", db_err)
+            logger.warning("Failed to fetch rules from Neo4j, falling back to mock: %s", db_err, exc_info=True)
             
         # Predefined mock rules fallback
         if not rules:
@@ -171,15 +175,20 @@ async def solve_problem(request: SolveRequest):
                 raw_rules = [
                     {"id": "r1", "name": "Sodium Hydration", "inputs": ["Na", "H2O"], "outputs": ["NaOH", "H2"], "description": "Sodium reacting with water."},
                     {"id": "r2", "name": "Water Synthesis", "inputs": ["H2", "O2"], "outputs": ["H2O"], "description": "Combustion of hydrogen."},
-                    {"id": "r3", "name": "Neutralization", "inputs": ["NaOH", "HCl"], "outputs": ["NaCl", "H2O"], "description": "Acid-base neutralization."}
+                    {"id": "r3", "name": "Neutralization", "inputs": ["NaOH", "HCl"], "outputs": ["NaCl", "H2O"], "description": "Acid-base neutralization."},
+                    {"id": "r_direct_na_hcl", "name": "Sodium Acid Reaction", "inputs": ["Na", "HCl"], "outputs": ["NaCl", "H2"], "description": "Direct reaction of Sodium with Hydrochloric acid."}
                 ]
             elif domain == "geometry":
                 raw_rules = [
-                    {"id": "t_trans", "name": "Congruence Transitivity", "inputs": ["Congruent(AB, CD)", "Congruent(CD, EF)"], "outputs": ["Congruent(AB, EF)"], "description": "Transitivity property."}
+                    {"id": "t_trans", "name": "Congruence Transitivity", "inputs": ["Congruent(AB, CD)", "Congruent(CD, EF)"], "outputs": ["Congruent(AB, EF)"], "description": "Transitivity property."},
+                    {"id": "g_perp_sym", "name": "Perpendicular Symmetry", "inputs": ["Perpendicular(d1, d2)"], "outputs": ["Perpendicular(d2, d1)"], "description": "If d1 is perpendicular to d2, then d2 is perpendicular to d1."},
+                    {"id": "g_para_trans", "name": "Parallel Transitivity", "inputs": ["Parallel(a, b)", "Parallel(b, c)"], "outputs": ["Parallel(a, c)"], "description": "If a || b and b || c, then a || c."}
                 ]
             elif domain == "algebra":
                 raw_rules = [
-                    {"id": "a_sub_two", "name": "Subtraction Property", "inputs": ["x+2=5", "Subtract(2, both_sides)"], "outputs": ["x=3"], "description": "Subtracting value from both sides."}
+                    {"id": "a_sub_two", "name": "Subtraction Property", "inputs": ["x+2=5", "Subtract(2, both_sides)"], "outputs": ["x=3"], "description": "Subtracting value from both sides."},
+                    {"id": "alg_solve", "name": "Basic Linear Solver", "inputs": ["x+2=5", "Subtract(2)"], "outputs": ["x=3"], "description": "Solving simple linear equation by subtraction."},
+                    {"id": "alg_add_prop", "name": "Addition Property", "inputs": ["x-3=10", "Add(3)"], "outputs": ["x=13"], "description": "Adding value to both sides."}
                 ]
             else:
                 raw_rules = []
@@ -249,8 +258,12 @@ async def solve_query(request: SolveQueryRequest):
                 with db_conn.get_session() as session:
                     result = session.run(
                         "MATCH (r:Rule) WHERE r.domain = $domain "
-                        "RETURN r.id AS id, r.name AS name, r.inputs AS inputs, "
-                        "r.outputs AS outputs, r.description AS description",
+                        "OPTIONAL MATCH (f_in:Fact)-[:HAS_INPUT]->(r) "
+                        "OPTIONAL MATCH (r)-[:HAS_OUTPUT]->(f_out:Fact) "
+                        "WITH r, "
+                        "     CASE WHEN r.inputs IS NOT NULL THEN r.inputs ELSE collect(DISTINCT f_in.value) END AS inputs, "
+                        "     CASE WHEN r.outputs IS NOT NULL THEN r.outputs ELSE collect(DISTINCT f_out.value) END AS outputs "
+                        "RETURN r.id AS id, r.name AS name, inputs, outputs, r.description AS description",
                         domain=domain
                     )
                     raw_rules = []
@@ -258,27 +271,34 @@ async def solve_query(request: SolveQueryRequest):
                         raw_rules.append({
                             "id": record["id"],
                             "name": record["name"],
-                            "inputs": record["inputs"],
-                            "outputs": record["outputs"],
-                            "description": record["description"]
+                            "inputs": record["inputs"] or [],
+                            "outputs": record["outputs"] or [],
+                            "description": record["description"] or ""
                         })
                     rules = [parser.parse_rule(r) for r in raw_rules]
                     logger.info("Loaded %d rules from Neo4j for query resolving in domain '%s'", len(rules), domain)
             db_conn.close()
         except Exception as db_err:
-            logger.warning("Failed to fetch rules from Neo4j, using built-in fallback: %s", db_err)
+            logger.warning("Failed to fetch rules from Neo4j, using built-in fallback: %s", db_err, exc_info=True)
 
         # Default rules fallback
         if not rules:
             logger.info("Using built-in fallback rules for query resolving on domain '%s'", domain)
             if domain == "chemistry":
                 raw_rules = [
-                    {"id": "rxn_single_na_h2o", "name": "Sodium Reacting with Water", "inputs": ["Na", "H2O"], "outputs": ["NaOH", "H2"], "description": ""},
-                    {"id": "rxn_double_naoh_hcl", "name": "Neutralization of NaOH and HCl", "inputs": ["NaOH", "HCl"], "outputs": ["NaCl", "H2O"], "description": ""}
+                    {"id": "rxn_single_na_h2o", "name": "Sodium Reacting with Water", "inputs": ["Na", "H2O"], "outputs": ["NaOH", "H2"], "description": "Sodium reacting with water to produce NaOH and H2."},
+                    {"id": "rxn_double_naoh_hcl", "name": "Neutralization of NaOH and HCl", "inputs": ["NaOH", "HCl"], "outputs": ["NaCl", "H2O"], "description": "Acid-base neutralization."},
+                    {"id": "r_direct_na_hcl", "name": "Sodium Acid Reaction", "inputs": ["Na", "HCl"], "outputs": ["NaCl", "H2"], "description": "Direct reaction of Sodium with Hydrochloric acid."}
                 ]
             elif domain == "geometry":
                 raw_rules = [
-                    {"id": "thm_congruence_transitivity", "name": "Transitivity of Congruence", "inputs": ["Congruent(AB, CD)", "Congruent(CD, EF)"], "outputs": ["Congruent(AB, EF)"], "description": ""}
+                    {"id": "thm_congruence_transitivity", "name": "Transitivity of Congruence", "inputs": ["Congruent(AB, CD)", "Congruent(CD, EF)"], "outputs": ["Congruent(AB, EF)"], "description": "If AB is congruent to CD and CD is congruent to EF, then AB is congruent to EF."},
+                    {"id": "g_perp_sym", "name": "Perpendicular Symmetry", "inputs": ["Perpendicular(d1, d2)"], "outputs": ["Perpendicular(d2, d1)"], "description": "If d1 is perpendicular to d2, then d2 is perpendicular to d1."}
+                ]
+            elif domain == "algebra":
+                raw_rules = [
+                    {"id": "alg_solve", "name": "Basic Linear Solver", "inputs": ["x+2=5", "Subtract(2)"], "outputs": ["x=3"], "description": "Solving simple linear equation by subtraction."},
+                    {"id": "alg_add_prop", "name": "Addition Property", "inputs": ["x-3=10", "Add(3)"], "outputs": ["x=13"], "description": "Adding value to both sides."}
                 ]
             else:
                 raw_rules = []
