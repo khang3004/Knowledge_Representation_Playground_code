@@ -50,6 +50,8 @@ services:
       - BACKEND_URL=http://backend:8080
     depends_on:
       - backend
+    volumes:
+      - .:/app
 
 volumes:
   neo4j_data:

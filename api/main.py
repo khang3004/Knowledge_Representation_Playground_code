@@ -88,6 +88,7 @@ class ExplainRequest(BaseModel):
     query: str = Field(..., description="Original natural language query.")
     domain: str = Field(..., description="Target domain.")
     execution_trace: List[ExecutionStepResponse] = Field(..., description="Solver execution trace.")
+    goal_reached: bool = Field(True, description="Whether the goal was successfully reached.")
 
 class ExplainResponse(BaseModel):
     explanation: str = Field(..., description="Rich, human-friendly, educational explanation.")
@@ -353,29 +354,50 @@ async def explain_proof(request: ExplainRequest):
         try:
             from langchain_core.prompts import ChatPromptTemplate
 
+            if request.goal_reached:
+                system_prompt = (
+                    "You are a Lead AI Architect and expert Neuro-Symbolic educational tutor. "
+                    "Your goal is to explain a successful logical proof path found by our symbolic solver "
+                    "in the domain '{domain}'. Make the explanation extremely engaging, "
+                    "pedagogically rich, and easy to read. "
+                    "Explain the chemical reactions, geometry axioms, or algebra theorems "
+                    "so that a high-school student can understand them perfectly. "
+                    "Use professional formatting, bullet points, and headers.\n"
+                    "Strict Constraint: You MUST ground your explanation ONLY in the facts "
+                    "and steps presented in the logical trace. Do not invent any new steps or hallucinate rules!"
+                )
+                human_prompt = "Explain this reasoning pathway for the question: '{query}'\n\nSolver Execution Trace:\n{trace}"
+            else:
+                system_prompt = (
+                    "You are a Lead AI Architect and expert Neuro-Symbolic educational tutor. "
+                    "Our symbolic solver attempted to prove the goal in the domain '{domain}' "
+                    "but FAILED because there is no valid proof path using the available rules and facts.\n"
+                    "Your goal is to explain this failure to a high-school student in an extremely engaging, "
+                    "pedagogically rich, and constructive manner. "
+                    "Identify what starting facts were mapped, what intermediate facts (if any) were deduced "
+                    "in the trace, and explain clearly and mathematically why the goal could not be reached "
+                    "(e.g., because the assumptions are not sufficient to prove the claim, or the registered rule database is missing the necessary theorems).\n"
+                    "Use professional formatting, bullet points, and headers.\n"
+                    "Strict Constraint: Do not hallucinate or claim that the goal was proven or reached! "
+                    "Always start by clearly stating that the goal is UNPROVED based on the available knowledge base."
+                )
+                human_prompt = "Pedagogically analyze the logical failure for this query: '{query}'\n\nSolver Execution Trace:\n{trace}"
+
             prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a Lead AI Architect and expert Neuro-Symbolic educational tutor. "
-                           "Your goal is to explain a logical proof path found by our symbolic solver "
-                           "in the domain '{domain}'. Make the explanation extremely engaging, "
-                           "pedagogically rich, and easy to read. "
-                           "Explain the chemical reactions, geometry axioms, or algebra theorems "
-                           "so that a high-school student can understand them perfectly. "
-                           "Use professional formatting, bullet points, and headers.\n"
-                           "Strict Constraint: You MUST ground your explanation ONLY in the facts "
-                           "and steps presented in the logical trace. Do not invent any new steps or hallucinate rules!"),
-                ("human", "Explain this reasoning pathway for the question: '{query}'\n\n"
-                          "Solver Execution Trace:\n{trace}")
+                ("system", system_prompt),
+                ("human", human_prompt)
             ])
 
-            logger.info("Generating proof explanation via model-agnostic LLM instance...")
+            logger.info("Generating proof explanation via model-agnostic LLM instance (Goal Reached: %s)...", request.goal_reached)
             chain = prompt | llm
 
             response = chain.invoke({
                 "domain": domain,
                 "query": request.query,
-                "trace": trace_text
+                "trace": trace_text if trace_text else "No rules were triggered."
             })
-            # Cleanly extract string content if returned as structured list (e.g. Google thinking blocks)
+            
+            # Cleanly extract string content
             content_str = ""
             if isinstance(response.content, str):
                 content_str = response.content
@@ -398,47 +420,70 @@ async def explain_proof(request: ExplainRequest):
             )
 
         except Exception as e:
-            logger.warning("LangChain OpenAI explanation generation failed: %s. Using template fallback.", e)
+            logger.warning("LangChain explanation generation failed: %s. Using template fallback.", e)
 
     # Offline Fallback Template-based Explainer
     logger.info("Generating template-based offline proof explanation.")
     
-    explanation_parts = [
-        f"# Educational Proof Explanation (Offline Mode)\n",
-        f"**Original Question**: *\"{request.query}\"*\n",
-        f"The symbolic core engine has successfully executed a formal deduction trace. Below is the step-by-step breakdown of how the goal was reached:\n",
-        f"## 1. Initial State",
-        f"We started with the concepts and assertions mapped from the query. These served as our starting points for logical chaining.\n",
-        f"## 2. Deduction Steps"
-    ]
+    if request.goal_reached:
+        explanation_parts = [
+            f"# Educational Proof Explanation (Offline Mode)\n",
+            f"**Original Question**: *\"{request.query}\"*\n",
+            f"The symbolic core engine has successfully executed a formal deduction trace. Below is the step-by-step breakdown of how the goal was reached:\n",
+            f"## 1. Initial State",
+            f"We started with the concepts and assertions mapped from the query. These served as our starting points for logical chaining.\n",
+            f"## 2. Deduction Steps"
+        ]
 
-    if not request.execution_trace:
-        explanation_parts.append("No rules were triggered. The goal was already satisfied by the initial facts or could not be proved.")
+        if not request.execution_trace:
+            explanation_parts.append("No rules were triggered. The goal was already satisfied by the initial facts or could not be proved.")
+        else:
+            for idx, step in enumerate(request.execution_trace):
+                explanation_parts.append(f"### Step {idx+1}: Activating {step.rule_id}")
+                explanation_parts.append(f"* **Applied Rule**: `{step.fired_rule_repr}`")
+                explanation_parts.append(f"* **New Deductions**: `{', '.join(step.new_facts)}`")
+                
+                # Domain specific educational descriptions
+                if domain == "chemistry":
+                    if "na_h2o" in step.rule_id or "r1" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: Sodium (`Na`) is a highly reactive alkali metal. When it comes into contact with water (`H2O`), it undergoes a vigorous oxidation-reduction reaction to synthesize sodium hydroxide (`NaOH`) and release highly flammable hydrogen gas (`H2`).")
+                    elif "naoh_hcl" in step.rule_id or "r3" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: This is a classic neutralization reaction. The strong base sodium hydroxide (`NaOH`) reacts with the strong acid hydrochloric acid (`HCl`) to form water (`H2O`) and table salt, sodium chloride (`NaCl`), in a standard double-displacement reaction.")
+                    else:
+                        explanation_parts.append("  * **Educational context**: A chemical reaction took place combining the reactants to synthesize the products according to standard stoichiometric ratios.")
+                elif domain == "geometry":
+                    if "trans" in step.rule_id or "t_trans" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: By Euclid's first common notion (Things which equal the same thing also equal one another), congruence is transitive. Since Segment 1 is congruent to Segment 2, and Segment 2 is congruent to Segment 3, Segment 1 is geometrically congruent to Segment 3.")
+                    else:
+                        explanation_parts.append("  * **Educational context**: A geometric theorem or axiom was applied to prove the congruence or relation between the geometric entities.")
+                else:
+                    explanation_parts.append("  * **Educational context**: Applied algebraic equivalence rules to transform the equations and isolate variables.")
+                explanation_parts.append("")
+
+        explanation_parts.append("## 3. Conclusion")
+        explanation_parts.append("By executing the dry logical proof sequence above, the goal has been successfully established and verified to be 100% mathematically and scientifically correct!")
     else:
-        for idx, step in enumerate(request.execution_trace):
-            explanation_parts.append(f"### Step {idx+1}: Activating {step.rule_id}")
-            explanation_parts.append(f"* **Applied Rule**: `{step.fired_rule_repr}`")
-            explanation_parts.append(f"* **New Deductions**: `{', '.join(step.new_facts)}`")
-            
-            # Domain specific educational descriptions
-            if domain == "chemistry":
-                if "na_h2o" in step.rule_id or "r1" in step.rule_id:
-                    explanation_parts.append("  * **Educational context**: Sodium (`Na`) is a highly reactive alkali metal. When it comes into contact with water (`H2O`), it undergoes a vigorous oxidation-reduction reaction to synthesize sodium hydroxide (`NaOH`) and release highly flammable hydrogen gas (`H2`).")
-                elif "naoh_hcl" in step.rule_id or "r3" in step.rule_id:
-                    explanation_parts.append("  * **Educational context**: This is a classic neutralization reaction. The strong base sodium hydroxide (`NaOH`) reacts with the strong acid hydrochloric acid (`HCl`) to form water (`H2O`) and table salt, sodium chloride (`NaCl`), in a standard double-displacement reaction.")
-                else:
-                    explanation_parts.append("  * **Educational context**: A chemical reaction took place combining the reactants to synthesize the products according to standard stoichiometric ratios.")
-            elif domain == "geometry":
-                if "trans" in step.rule_id or "t_trans" in step.rule_id:
-                    explanation_parts.append("  * **Educational context**: By Euclid's first common notion (Things which equal the same thing also equal one another), congruence is transitive. Since Segment 1 is congruent to Segment 2, and Segment 2 is congruent to Segment 3, Segment 1 is geometrically congruent to Segment 3.")
-                else:
-                    explanation_parts.append("  * **Educational context**: A geometric theorem or axiom was applied to prove the congruence or relation between the geometric entities.")
-            else:
-                explanation_parts.append("  * **Educational context**: Applied algebraic equivalence rules to transform the equations and isolate variables.")
-            explanation_parts.append("")
+        explanation_parts = [
+            f"# Educational Proof Analysis (Goal Unproved - Offline Mode)\n",
+            f"**Original Question**: *\"{request.query}\"*\n",
+            f"The symbolic core engine attempted to deduce the target goal using forward-chaining rules but was **unable to prove it** from the given assumptions.\n",
+            f"## 1. Initial State & Mapping",
+            f"We started with the concepts and assertions mapped from the query. These served as our initial set of facts.\n",
+            f"## 2. Saturation & Attempted Deductions"
+        ]
 
-    explanation_parts.append("## 3. Conclusion")
-    explanation_parts.append("By executing the dry logical proof sequence above, the goal has been successfully established and verified to be 100% mathematically and scientifically correct!")
+        if not request.execution_trace:
+            explanation_parts.append("No rules could be triggered. The initial facts did not satisfy the prerequisites for any active theorems in the domain.")
+        else:
+            explanation_parts.append("The solver triggered the following rules but could not bridge the logical gap to reach the goal:")
+            for idx, step in enumerate(request.execution_trace):
+                explanation_parts.append(f"### Step {idx+1}: Activating {step.rule_id}")
+                explanation_parts.append(f"* **Applied Rule**: `{step.fired_rule_repr}`")
+                explanation_parts.append(f"* **New Deductions**: `{', '.join(step.new_facts)}`")
+                explanation_parts.append("")
+
+        explanation_parts.append("## 3. Conclusion")
+        explanation_parts.append("⚠️ **Logical Gap Detected**: The target goal could not be proved. This is either because the starting facts are logically independent from the goal, or the registered rule database is missing the necessary connecting theorems.")
 
     explanation = "\n".join(explanation_parts)
     return ExplainResponse(

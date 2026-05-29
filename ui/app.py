@@ -61,7 +61,7 @@ def solve_query(query: str, domain: str) -> dict:
         return {"error": f"❌ Unexpected error: {str(e)}"}
 
 
-def explain_proof(query: str, domain: str, execution_trace: list) -> str:
+def explain_proof(query: str, domain: str, execution_trace: list, goal_reached: bool = True) -> str:
     """POST to the explain endpoint for rich educational markdown."""
     try:
         resp = requests.post(
@@ -69,7 +69,8 @@ def explain_proof(query: str, domain: str, execution_trace: list) -> str:
             json={
                 "query": query,
                 "domain": domain,
-                "execution_trace": execution_trace
+                "execution_trace": execution_trace,
+                "goal_reached": goal_reached
             },
             timeout=120
         )
@@ -357,7 +358,7 @@ if user_input:
             trace_data = result.get("execution_trace", [])
             if trace_data:
                 with st.spinner("📝 Generating educational explanation..."):
-                    explanation = explain_proof(user_input, domain, trace_data)
+                    explanation = explain_proof(user_input, domain, trace_data, goal_reached)
                 if explanation:
                     st.markdown(explanation)
                     response_parts.append(explanation)
