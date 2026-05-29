@@ -1,0 +1,23 @@
+\section{Introduction}
+\label{sec:intro}
+
+In recent years, connectionist artificial intelligence, led by Large Language Models (LLMs), has achieved human-level performance in creative writing, code generation, and multi-turn dialogue. Despite these breakthroughs, LLMs struggle to solve formal reasoning tasks that require strict deductive logic, mathematical rigor, and exact symbol manipulation~\cite{creswell2018selection}. Typical failures include hallucinating invalid equations, applying non-applicable theorems, and creating circular dependencies in proofs. 
+
+These deficiencies arise because LLMs are fundamentally probabilistic sequence predictors, optimizing the likelihood of subsequent tokens based on high-dimensional associations:
+\begin{equation}
+    P(T_n \mid T_{1}, T_{2}, \dots, T_{n-1})
+\end{equation}
+This probabilistic paradigm is inherently mismatched with the algebraic and deductive structures of formal logic, where truth values are binary, deterministic, and highly sensitive to syntax. For instance, in Euclidean geometry, a single misplaced parenthesis in a predicate like \texttt{RightTriangle(A,B,C)} vs. \texttt{RightTriangle(ABC,A)} disrupts the logical unification in propositional solving. Similarly, in chemistry, balancing stoichiometric equations like $2\text{Na} + 2\text{H}_2\text{O} \to 2\text{NaOH} + \text{H}_2$ requires exact integer conservation, which LLMs routinely violate when performing multi-step reaction reasoning.
+
+To overcome these weaknesses, we present \textbf{Omni-IPS} (\textit{Neuro-Symbolic \& GraphRAG Multi-Domain Intelligent Problem Solver}). Omni-IPS combines the strengths of statistical language modeling (for natural language parsing and human-friendly explanation streaming) and symbolic computer science (for deterministic theorem proving and exact database mapping). 
+
+\subsection{Core Contributions}
+Our work introduces three primary contributions to the field of hybrid artificial intelligence:
+\begin{itemize}
+    \item \textbf{A Dual-Database Neuro-Symbolic Router}: We construct an ingestion framework using \textbf{Neo4j} (as a rigid graph store for rules and properties) and \textbf{Qdrant} (as a semantic vector index for fuzzy match resolving). This enables natural language queries to be robustly parsed and aligned to concrete database entities even under variable phrasing.
+    \item \textbf{Nested Balanced-Parenthesis Predicate Parsing}: We implement a linear-time $O(N)$ syntax parser that handles nested arguments (e.g., \texttt{RightAngle(Angle(BAC))}) and enforces geometric commutativity (e.g., automatically sorting and standardizing commutative predicates like \texttt{Parallel(AB,CD)} into \texttt{Parallel(AB,CD)}).
+    \item \textbf{Domain-Agnostic Propositional Reasoning Core}: We develop high-efficiency Forward Chaining and Backward Chaining inference engines that run locally within a closed-world memory. These engines execute purely symbolic logic, mathematically ensuring that any generated step-by-step trace is logically sound and provably correct.
+\end{itemize}
+
+\subsection{Organization of the Report}
+The rest of this document is organized as follows. Section~\ref{sec:pipelines} details the data pipelines and Wikipedia/Wikidata ingestion strategies. Section~\ref{sec:knowledge_graph} explores our Neo4j graph model, relational schemas, and commutative property rules. Section~\ref{sec:rag_router} introduces the hybrid Qdrant vector-exact mapping router and the nested parenthesis parser. Section~\ref{sec:reasoning_engine} formulates the symbolic Forward and Backward Chaining algorithms mathematically with detailed pseudo-code. Section~\ref{sec:system_integration} specifies our FastAPI backend API routes, streaming architectures, and Streamlit frontend components. Section~\ref{sec:evaluation} displays the postman API testing schemas, verification examples, and quantitative results. Finally, Section~\ref{sec:conclusion} concludes the paper and discusses future work.

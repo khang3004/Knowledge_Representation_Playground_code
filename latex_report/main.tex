@@ -1,0 +1,132 @@
+\documentclass[11pt,journal,onecolumn]{article}
+
+% --- Core Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsfonts, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+% --- TikZ Setup ---
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, shadows}
+\tikzset{
+    base/.style={draw, rectangle, rounded corners=3pt, minimum width=3cm, minimum height=1cm, text centered, font=\sffamily\small, fill=white},
+    process/.style={base, fill=blue!10, border width=1.1pt, draw=blue!70!black},
+    database/.style={draw, cylinder, cylinder points=20, shape border rotate=90, minimum width=2cm, minimum height=1.5cm, aspect=0.25, fill=orange!10, draw=orange!70!black, font=\sffamily\small},
+    decision/.style={draw, diamond, aspect=2, minimum width=3.5cm, minimum height=1cm, text centered, fill=green!10, draw=green!70!black, font=\sffamily\small},
+    agent/.style={base, fill=purple!10, draw=purple!70!black, font=\sffamily\bfseries\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick, draw=gray!80!black}
+}
+
+% --- Listing Styles (Python & JSON) ---
+\definecolor{codegreen}{rgb}{0.1,0.5,0.1}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.5,0,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.2,0.8}
+\definecolor{backgroundgray}{rgb}{0.97,0.97,0.98}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{backgroundgray},   
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=4,
+    frame=tb,
+    rulecolor=\color{gray!30}
+}
+
+\lstdefinestyle{jsonstyle}{
+    backgroundcolor=\color{backgroundgray},   
+    basicstyle=\ttfamily\small,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    keywordstyle=\color{codeblue},
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    frame=tb,
+    rulecolor=\color{gray!30}
+}
+
+% --- Math Operators and Shortcuts ---
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\WM}{\mathcal{WM}}
+\newcommand{\Rules}{\mathcal{R}}
+\newcommand{\Facts}{\mathcal{F}}
+\newcommand{\simscore}{\text{Sim}}
+
+% --- Graphicspath config ---
+\graphicspath{{../assets/}{assets/}}
+
+% --- Document Metadata ---
+\title{\textbf{Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver \\ for Multi-Domain Formal Reasoning}}
+\author{
+    \textbf{Nguyen-Duc Khang} \\
+    Faculty of Information Technology \\
+    University of Science, VNU-HCM \\
+    \texttt{ndkhang@fit.hcmus.edu.vn}
+}
+\date{May 2026}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=green!50!black,
+    urlcolor=teal!80!black,
+    pdftitle={Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver for Multi-Domain Formal Reasoning},
+    pdfauthor={Nguyen-Duc Khang}
+}
+
+\begin{document}
+
+\maketitle
+
+\input{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\input{introduction}
+\input{pipelines}
+\input{knowledge_graph}
+\input{rag_router}
+\input{reasoning_engine}
+\input{system_integration}
+\input{evaluation}
+\input{conclusion}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

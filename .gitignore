@@ -1,3 +1,4 @@
 /tests
 .env
 /data/qdrant/*
+latex_report/main.pdf
