@@ -8,36 +8,39 @@ The complete data flow of Omni-IPS is visualised in the TikZ system architecture
 
 \begin{figure}[p]
     \centering
-    \begin{tikzpicture}[node distance=1.8cm, auto]
+    \begin{tikzpicture}[node distance=2.1cm, auto]
         % Nodes
-        \node (input) [process, fill=red!10, draw=red!70!black] {\textbf{User Query} \\ (Natural Language)};
-        \node (llm_parser) [process, below of=input] {\textbf{LLM Parser Agent} \\ (Extracts Facts \& Goal)};
-        \node (bp_scanner) [process, below of=llm_parser] {\textbf{Balanced Paren Scanner} \\ (Commutative Canonicalization)};
+        \node (input) [process, fill=red!10, draw=red!70!black] {\textbf{User Query} \\ \small (Natural Language)};
+        \node (llm_parser) [process, below of=input] {\textbf{LLM Parser Agent} \\ \small (Extracts Facts \& Goal)};
+        \node (bp_scanner) [process, below of=llm_parser] {\textbf{Balanced Paren Scanner} \\ \small (Commutative Canonicalization)};
         \node (router) [process, below of=bp_scanner, fill=yellow!10, draw=yellow!70!black] {\textbf{Neuro-Symbolic Router}};
         
-        \node (qdrant) [database, right=2cm of router] {\textbf{Qdrant Vector DB} \\ (Semantic Index)};
-        \node (neo4j) [database, left=2cm of router] {\textbf{Neo4j Graph DB} \\ (Logical Schema)};
+        \node (qdrant) [database, right=3.6cm of router] {\textbf{Qdrant Vector DB} \\ \small (Semantic Index)};
+        \node (neo4j) [database, left=3.6cm of router] {\textbf{Neo4j Graph DB} \\ \small (Logical Schema)};
         
-        \node (solver) [agent, below of=router, minimum width=4cm, minimum height=1.2cm] {\textbf{Symbolic Reasoner} \\ (Forward/Backward Chaining)};
-        \node (explain) [process, below of=solver] {\textbf{Explainability Agent} \\ (LLM Proof Generation)};
-        \node (ui) [process, below of=explain, fill=green!10, draw=green!70!black] {\textbf{Streamlit UI} \\ (Streaming Output)};
+        \node (solver) [agent, below of=router, minimum width=4cm, minimum height=1.2cm] {\textbf{Symbolic Reasoner} \\ \small (Forward/Backward Chaining)};
+        \node (explain) [process, below of=solver] {\textbf{Explainability Agent} \\ \small (LLM Proof Generation)};
+        \node (ui) [process, below of=explain, fill=green!10, draw=green!70!black] {\textbf{Streamlit UI} \\ \small (Streaming Output)};
 
-        % Paths
+        % Paths (Vertical Flows)
         \draw [arrow] (input) -- (llm_parser);
         \draw [arrow] (llm_parser) -- (bp_scanner);
         \draw [arrow] (bp_scanner) -- (router);
         
-        \draw [arrow] (router.east) -- node [above] {Vector Query} (qdrant.west);
-        \draw [arrow] (qdrant.west) -- node [below, align=left] {Score $\ge 0.85$ \\ (Fact Matching)} (router.east);
+        % Parallel Canvas-Shifted Arrows (Router <-> Qdrant)
+        \draw [arrow, transform canvas={yshift=2mm}] (router.east) -- node [above, font=\sffamily\scriptsize\bfseries, align=center] {Query Vector} (qdrant.west);
+        \draw [arrow, transform canvas={yshift=-2mm}] (qdrant.west) -- node [below, font=\sffamily\scriptsize, align=center] {Confidence Match \\ $\ge 0.85$} (router.east);
         
-        \draw [arrow] (router.west) -- node [above] {Cypher Load} (neo4j.east);
-        \draw [arrow] (neo4j.east) -- node [below] {Active Rules} (router.west);
+        % Parallel Canvas-Shifted Arrows (Router <-> Neo4j)
+        \draw [arrow, transform canvas={yshift=2mm}] (router.west) -- node [above, font=\sffamily\scriptsize\bfseries, align=center] {Cypher Request} (neo4j.east);
+        \draw [arrow, transform canvas={yshift=-2mm}] (neo4j.east) -- node [below, font=\sffamily\scriptsize, align=center] {Active Rules \\ loaded} (router.west);
         
-        \draw [arrow] (router) -- node [right] {Working Memory} (solver);
-        \draw [arrow] (solver) -- node [right] {Execution Trace} (explain);
-        \draw [arrow] (explain) -- node [right] {Token Stream} (ui);
+        % Paths (Solver and Explain flows)
+        \draw [arrow] (router) -- node [right, font=\sffamily\scriptsize, align=left] {Working\\Memory} (solver);
+        \draw [arrow] (solver) -- node [right, font=\sffamily\scriptsize, align=left] {Execution\\Trace} (explain);
+        \draw [arrow] (explain) -- node [right, font=\sffamily\scriptsize, align=left] {Explanation\\Stream} (ui);
     \end{tikzpicture}
-    \caption{Omni-IPS System Architecture showing the pipeline from natural language query parsing, dual-database routing (Qdrant & Neo4j), deterministic logical solver reasoning, to streamed markdown explanation generation.}
+    \caption{Omni-IPS System Architecture showing the pipeline from natural language query parsing, dual-database routing (Qdrant \& Neo4j), deterministic logical solver reasoning, to streamed markdown explanation generation.}
     \label{fig:architecture}
 \end{figure}
 

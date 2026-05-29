@@ -15,13 +15,14 @@
 \usepackage{tikz}
 \usepackage{hyperref}
 \usepackage{cleveref}
+\usepackage{fontawesome5} % For GitHub and tech stack icons
 
 % --- TikZ Setup ---
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, shadows}
 \tikzset{
-    base/.style={draw, rectangle, rounded corners=3pt, minimum width=3cm, minimum height=1cm, text centered, font=\sffamily\small, fill=white},
-    process/.style={base, fill=blue!10, border width=1.1pt, draw=blue!70!black},
-    database/.style={draw, cylinder, cylinder points=20, shape border rotate=90, minimum width=2cm, minimum height=1.5cm, aspect=0.25, fill=orange!10, draw=orange!70!black, font=\sffamily\small},
+    base/.style={draw, rectangle, rounded corners=4pt, minimum width=3.2cm, minimum height=1cm, text centered, font=\sffamily\small, fill=white},
+    process/.style={base, fill=blue!10, line width=1.1pt, draw=blue!70!black},
+    database/.style={draw, cylinder, cylinder points=20, shape border rotate=90, minimum width=2.8cm, minimum height=1.6cm, aspect=0.25, fill=orange!10, draw=orange!70!black, font=\sffamily\small, align=center},
     decision/.style={draw, diamond, aspect=2, minimum width=3.5cm, minimum height=1cm, text centered, fill=green!10, draw=green!70!black, font=\sffamily\small},
     agent/.style={base, fill=purple!10, draw=purple!70!black, font=\sffamily\bfseries\small},
     arrow/.style={-{Stealth[scale=1.2]}, thick, draw=gray!80!black}
@@ -89,12 +90,18 @@
 \graphicspath{{../assets/}{assets/}}
 
 % --- Document Metadata ---
-\title{\textbf{Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver \\ for Multi-Domain Formal Reasoning}}
+\title{
+    \textbf{Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver \\ for Multi-Domain Formal Reasoning} \\
+    \vspace{0.4cm}
+    \large Course Assignment 1: Applied Knowledge Representation
+}
 \author{
-    \textbf{Nguyen-Duc Khang} \\
-    Faculty of Information Technology \\
-    University of Science, VNU-HCM \\
-    \texttt{ndkhang@fit.hcmus.edu.vn}
+    \textbf{Hoang-Khang Nguyen}$^{(1), (2)}$ \\
+    \small $^{(1)}$University of Science, Ho Chi Minh City, Vietnam \\
+    \small $^{(2)}$Vietnam National University, Ho Chi Minh City, Vietnam \\
+    \small Email: \texttt{25c0103580@student.hcmus.edu.vn} \\
+    \vspace{0.2cm}
+    \small \href{https://github.com/khang3004/NeuralSymbolic_OmniIPS_Knowledge_Representation_Playground.git}{\faGithub\ khang3004/NeuralSymbolic\_OmniIPS\_Knowledge\_Representation\_Playground}
 }
 \date{May 2026}
 
@@ -103,8 +110,8 @@
     linkcolor=blue!70!black,
     citecolor=green!50!black,
     urlcolor=teal!80!black,
-    pdftitle={Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver for Multi-Domain Formal Reasoning},
-    pdfauthor={Nguyen-Duc Khang}
+    pdftitle={Omni-IPS: A Hybrid Neuro-Symbolic GraphRAG Solver for Multi-Domain Formal Reasoning (Assignment 1 Report)},
+    pdfauthor={Hoang-Khang Nguyen}
 }
 
 \begin{document}

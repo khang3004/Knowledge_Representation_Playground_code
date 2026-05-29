@@ -3,6 +3,26 @@
 
 To build a production-ready application, the isolated reasoning components of Omni-IPS are assembled into a cohesive microservice architecture. The system consists of a high-performance **FastAPI Gateway** backend and an interactive **Streamlit Client** frontend. Communication is managed via strictly typed JSON APIs and reactive asynchronous streams.
 
+\subsection{Omni-IPS Core Technology Stack}
+The complete technical ecosystem powering Omni-IPS is selected for speed, rigid typing, and robust database operations. We summarize the core tech stack components in Table~\ref{tab:tech_stack}.
+
+\begin{table}[h]
+    \centering
+    \caption{Omni-IPS Architectural Technology Stack Summary}
+    \label{tab:tech_stack}
+    \begin{tabular}{llcl}
+        \toprule
+        \textbf{Component Layer} & \textbf{Framework/DB} & \textbf{Icon} & \textbf{Functional Role in System} \\
+        \midrule
+        Core Language & Python 3.11 & \textcolor{blue!70!black}{\faPython} & Logical scanner, parsing, and reasoning chainer core \\
+        Backend API & FastAPI & \textcolor{teal!70!black}{\faServer} & Async REST endpoints, Pydantic gates, streaming response \\
+        Graph Database & Neo4j DB & \textcolor{blue!60!black}{\faNetworkWired} & Canonical rule \& fact storage, structural schema integrity \\
+        Vector Database & Qdrant & \textcolor{red!70!black}{\faBrain} & High-dimensional semantic embeds ($d=384$) \& query matching \\
+        Web Frontend UI & Streamlit & \textcolor{orange!80!black}{\faDesktop} & Typewriter markdown rendering, real-time chunk streams \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \subsection{FastAPI API Gateway}
 The backend service in \texttt{api/main.py} acts as the orchestrator. It receives client requests, triggers the RAG router, queries Neo4j for active rules, runs the symbolic engine, and returns results. 
 
