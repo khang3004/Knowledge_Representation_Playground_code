@@ -4,11 +4,13 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+import asyncio
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 # Core engine and domain imports
 from core_engine import ForwardChainingEngine, BackwardChainingEngine
@@ -490,6 +492,164 @@ async def explain_proof(request: ExplainRequest):
         explanation=explanation,
         structured=False
     )
+
+
+@app.post("/api/explain/stream", tags=["Explainability Agent"])
+async def explain_proof_stream(request: ExplainRequest):
+    """
+    Explainability Agent (Streaming): Streams a rich educational explanation chunk-by-chunk.
+    """
+    domain = request.domain.lower()
+
+    # Formulate a dry trace text summary
+    trace_text = ""
+    for idx, step in enumerate(request.execution_trace):
+        trace_text += f"Step {idx+1}: Fired Rule [{step.rule_id}] -> {step.fired_rule_repr}. New facts deduced: {step.new_facts}\n"
+
+    # LLM Pathway
+    from rag_agent.llm_factory import get_llm
+    llm = get_llm(temperature=0.3)
+    if llm:
+        try:
+            from langchain_core.prompts import ChatPromptTemplate
+
+            if request.goal_reached:
+                system_prompt = (
+                    "You are a Lead AI Architect and expert Neuro-Symbolic educational tutor. "
+                    "Your goal is to explain a successful logical proof path found by our symbolic solver "
+                    "in the domain '{domain}'. Make the explanation extremely engaging, "
+                    "pedagogically rich, and easy to read. "
+                    "Explain the chemical reactions, geometry axioms, or algebra theorems "
+                    "so that a high-school student can understand them perfectly. "
+                    "Use professional formatting, bullet points, and headers.\n"
+                    "Strict Constraint: You MUST ground your explanation ONLY in the facts "
+                    "and steps presented in the logical trace. Do not invent any new steps or hallucinate rules!"
+                )
+                human_prompt = "Explain this reasoning pathway for the question: '{query}'\n\nSolver Execution Trace:\n{trace}"
+            else:
+                system_prompt = (
+                    "You are a Lead AI Architect and expert Neuro-Symbolic educational tutor. "
+                    "Our symbolic solver attempted to prove the goal in the domain '{domain}' "
+                    "but FAILED because there is no valid proof path using the available rules and facts.\n"
+                    "Your goal is to explain this failure to a high-school student in an extremely engaging, "
+                    "pedagogically rich, and constructive manner. "
+                    "Identify what starting facts were mapped, what intermediate facts (if any) were deduced "
+                    "in the trace, and explain clearly and mathematically why the goal could not be reached "
+                    "(e.g., because the assumptions are not sufficient to prove the claim, or the registered rule database is missing the necessary theorems).\n"
+                    "Use professional formatting, bullet points, and headers.\n"
+                    "Strict Constraint: Do not hallucinate or claim that the goal was proven or reached! "
+                    "Always start by clearly stating that the goal is UNPROVED based on the available knowledge base."
+                )
+                human_prompt = "Pedagogically analyze the logical failure for this query: '{query}'\n\nSolver Execution Trace:\n{trace}"
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+
+            logger.info("Streaming proof explanation via model-agnostic LLM instance (Goal Reached: %s)...", request.goal_reached)
+            
+            async def generate_chunks():
+                chain = prompt | llm
+                async for chunk in chain.astream({
+                    "domain": domain,
+                    "query": request.query,
+                    "trace": trace_text if trace_text else "No rules were triggered."
+                }):
+                    content = chunk.content
+                    if not content:
+                        continue
+                    
+                    if isinstance(content, str):
+                        yield content
+                    elif isinstance(content, list):
+                        text_parts = []
+                        for part in content:
+                            if isinstance(part, str):
+                                text_parts.append(part)
+                            elif isinstance(part, dict) and "text" in part:
+                                text_parts.append(part["text"])
+                            elif hasattr(part, "text"):
+                                text_parts.append(getattr(part, "text"))
+                        yield "".join(text_parts)
+                    else:
+                        yield str(content)
+
+            return StreamingResponse(generate_chunks(), media_type="text/plain")
+
+        except Exception as e:
+            logger.warning("Streaming LLM explanation failed: %s. Using template fallback.", e)
+
+    # Offline Fallback Template-based Explainer (Yields in chunks to simulate stream)
+    logger.info("Generating template-based offline proof explanation in streaming mode.")
+    
+    explanation_parts = []
+    if request.goal_reached:
+        explanation_parts = [
+            f"# Educational Proof Explanation (Offline Mode)\n\n",
+            f"**Original Question**: *\"{request.query}\"*\n\n",
+            f"The symbolic core engine has successfully executed a formal deduction trace. Below is the step-by-step breakdown of how the goal was reached:\n\n",
+            f"## 1. Initial State\n",
+            f"We started with the concepts and assertions mapped from the query. These served as our starting points for logical chaining.\n\n",
+            f"## 2. Deduction Steps\n"
+        ]
+
+        if not request.execution_trace:
+            explanation_parts.append("No rules were triggered. The goal was already satisfied by the initial facts or could not be proved.\n")
+        else:
+            for idx, step in enumerate(request.execution_trace):
+                explanation_parts.append(f"### Step {idx+1}: Activating {step.rule_id}\n")
+                explanation_parts.append(f"* **Applied Rule**: `{step.fired_rule_repr}`\n")
+                explanation_parts.append(f"* **New Deductions**: `{', '.join(step.new_facts)}`\n")
+                
+                # Domain specific educational descriptions
+                if domain == "chemistry":
+                    if "na_h2o" in step.rule_id or "r1" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: Sodium (`Na`) is a highly reactive alkali metal. When it comes into contact with water (`H2O`), it undergoes a vigorous oxidation-reduction reaction to synthesize sodium hydroxide (`NaOH`) and release highly flammable hydrogen gas (`H2`).\n")
+                    elif "naoh_hcl" in step.rule_id or "r3" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: This is a classic neutralization reaction. The strong base sodium hydroxide (`NaOH`) reacts with the strong acid hydrochloric acid (`HCl`) to form water (`H2O`) and table salt, sodium chloride (`NaCl`), in a standard double-displacement reaction.\n")
+                    else:
+                        explanation_parts.append("  * **Educational context**: A chemical reaction took place combining the reactants to synthesize the products according to standard stoichiometric ratios.\n")
+                elif domain == "geometry":
+                    if "trans" in step.rule_id or "t_trans" in step.rule_id:
+                        explanation_parts.append("  * **Educational context**: By Euclid's first common notion (Things which equal the same thing also equal one another), congruence is transitive. Since Segment 1 is congruent to Segment 2, and Segment 2 is congruent to Segment 3, Segment 1 is geometrically congruent to Segment 3.\n")
+                    else:
+                        explanation_parts.append("  * **Educational context**: A geometric theorem or axiom was applied to prove the congruence or relation between the geometric entities.\n")
+                else:
+                    explanation_parts.append("  * **Educational context**: Applied algebraic equivalence rules to transform the equations and isolate variables.\n")
+                explanation_parts.append("\n")
+
+        explanation_parts.append("## 3. Conclusion\n")
+        explanation_parts.append("By executing the dry logical proof sequence above, the goal has been successfully established and verified to be 100% mathematically and scientifically correct!\n")
+    else:
+        explanation_parts = [
+            f"# Educational Proof Analysis (Goal Unproved - Offline Mode)\n\n",
+            f"**Original Question**: *\"{request.query}\"*\n\n",
+            f"The symbolic core engine attempted to deduce the target goal using forward-chaining rules but was **unable to prove it** from the given assumptions.\n\n",
+            f"## 1. Initial State & Mapping\n",
+            f"We started with the concepts and assertions mapped from the query. These served as our initial set of facts.\n\n",
+            f"## 2. Saturation & Attempted Deductions\n"
+        ]
+
+        if not request.execution_trace:
+            explanation_parts.append("No rules could be triggered. The initial facts did not satisfy the prerequisites for any active theorems in the domain.\n")
+        else:
+            explanation_parts.append("The solver triggered the following rules but could not bridge the logical gap to reach the goal:\n\n")
+            for idx, step in enumerate(request.execution_trace):
+                explanation_parts.append(f"### Step {idx+1}: Activating {step.rule_id}\n")
+                explanation_parts.append(f"* **Applied Rule**: `{step.fired_rule_repr}`\n")
+                explanation_parts.append(f"* **New Deductions**: `{', '.join(step.new_facts)}`\n")
+                explanation_parts.append("\n")
+
+        explanation_parts.append("## 3. Conclusion\n")
+        explanation_parts.append("⚠️ **Logical Gap Detected**: The target goal could not be proved. This is either because the starting facts are logically independent from the goal, or the registered rule database is missing the necessary connecting theorems.\n")
+
+    async def generate_template_chunks():
+        for chunk in explanation_parts:
+            yield chunk
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(generate_template_chunks(), media_type="text/plain")
 
 
 @app.get("/rules", tags=["Knowledge Graph"])

@@ -61,24 +61,37 @@ def solve_query(query: str, domain: str) -> dict:
         return {"error": f"❌ Unexpected error: {str(e)}"}
 
 
-def explain_proof(query: str, domain: str, execution_trace: list, goal_reached: bool = True) -> str:
-    """POST to the explain endpoint for rich educational markdown."""
+def explain_proof(query: str, domain: str, execution_trace: list, goal_reached: bool = True):
+    """POST to the explain/stream endpoint and yield rich educational markdown chunks."""
     try:
         resp = requests.post(
-            f"{BACKEND_URL}/api/explain",
+            f"{BACKEND_URL}/api/explain/stream",
             json={
                 "query": query,
                 "domain": domain,
                 "execution_trace": execution_trace,
                 "goal_reached": goal_reached
             },
+            stream=True,
             timeout=120
         )
         resp.raise_for_status()
-        data = resp.json()
-        return data.get("explanation", "")
+        
+        import codecs
+        decoder = codecs.getincrementaldecoder('utf-8')()
+        for raw_chunk in resp.iter_content(chunk_size=1024):
+            if raw_chunk:
+                chunk = decoder.decode(raw_chunk)
+                for char in chunk:
+                    yield char
+                    time.sleep(0.002)  # Smooth, fluid typing speed (2ms per character)
+        
+        chunk = decoder.decode(b'', final=True)
+        for char in chunk:
+            yield char
+            time.sleep(0.002)
     except Exception as e:
-        return f"*Explanation unavailable: {str(e)}*"
+        yield f"\n\n*Explanation stream error: {str(e)}*"
 
 
 # ---------------------------------------------------------------------------
@@ -271,9 +284,70 @@ if "messages" not in st.session_state:
 # Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=msg.get("avatar")):
-        st.markdown(msg["content"], unsafe_allow_html=True)
+        if msg["role"] == "user":
+            st.markdown(msg["content"])
+        else:
+            # Assistant response
+            if "error" in msg:
+                st.error(msg["error"])
+            else:
+                result = msg.get("result", {})
+                explanation = msg.get("explanation", "")
+                
+                # Goal status badge
+                goal_reached = result.get("goal_reached", False)
+                if goal_reached:
+                    st.markdown('<div class="goal-badge goal-reached">✅ Goal Reached!</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="goal-badge goal-missed">⚠️ Goal Not Reached</div>', unsafe_allow_html=True)
+                
+                # GraphRAG Processing Info expander
+                with st.expander("🔍 GraphRAG Processing Info", expanded=False):
+                    # Mapped facts
+                    st.markdown("**Qdrant-Mapped Initial Facts:**")
+                    mapped_facts = result.get("mapped_initial_facts", [])
+                    if mapped_facts:
+                        chips = " ".join([f'<span class="fact-chip">{f}</span>' for f in mapped_facts])
+                        st.markdown(chips, unsafe_allow_html=True)
+                    else:
+                        st.caption("No facts mapped.")
+                    
+                    # Mapped goal
+                    st.markdown(f"**Mapped Goal:** `{result.get('mapped_goal', 'N/A')}`")
+                    
+                    # Raw trace data
+                    st.markdown("**Execution Trace (Raw):**")
+                    trace = result.get("execution_trace", [])
+                    if trace:
+                        for step in trace:
+                            st.code(
+                                f"Rule: {step.get('rule_id', '?')} → {step.get('fired_rule_repr', '?')}\n"
+                                f"New facts: {step.get('new_facts', [])}",
+                                language="text"
+                            )
+                    else:
+                        st.caption("No rules fired.")
+                    
+                    # All known facts
+                    st.markdown("**Final Known Facts:**")
+                    known = result.get("known_facts", [])
+                    if known:
+                        st.code(", ".join(known), language="text")
+                
+                # Logical trace path
+                rule_ids = result.get("applied_rule_ids", [])
+                if rule_ids:
+                    trace_str = " → ".join(rule_ids)
+                    st.markdown(f'<div class="trace-path">📋 Proof Path: {trace_str}</div>', unsafe_allow_html=True)
+                
+                # Rich LLM Explanation
+                st.markdown("---")
+                if explanation:
+                    st.markdown(explanation)
+                else:
+                    st.info("No explanation generated.")
 
-# Chat input
+# Chat input at the bottom
 user_input = st.chat_input(
     placeholder=DOMAIN_PLACEHOLDERS.get(domain, "Type your query...")
 )
@@ -285,35 +359,34 @@ if user_input:
         "content": user_input,
         "avatar": "👤"
     })
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(user_input)
+    st.rerun()
+
+# Assistant turn execution
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+    user_msg = st.session_state.messages[-1]["content"]
     
-    # Process with backend
     with st.chat_message("assistant", avatar="🧠"):
         with st.spinner("🔄 Routing through Neuro-Symbolic pipeline..."):
-            result = solve_query(user_input, domain)
+            result = solve_query(user_msg, domain)
         
         if "error" in result:
             error_msg = result["error"]
             st.error(error_msg)
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": error_msg,
-                "avatar": "🧠"
+                "avatar": "🧠",
+                "error": error_msg
             })
+            st.rerun()
         else:
-            response_parts = []
-            
-            # Goal status badge
+            # 1. Goal status badge
             goal_reached = result.get("goal_reached", False)
             if goal_reached:
-                badge_html = '<div class="goal-badge goal-reached">✅ Goal Reached!</div>'
+                st.markdown('<div class="goal-badge goal-reached">✅ Goal Reached!</div>', unsafe_allow_html=True)
             else:
-                badge_html = '<div class="goal-badge goal-missed">⚠️ Goal Not Reached</div>'
-            st.markdown(badge_html, unsafe_allow_html=True)
-            response_parts.append(badge_html)
+                st.markdown('<div class="goal-badge goal-missed">⚠️ Goal Not Reached</div>', unsafe_allow_html=True)
             
-            # GraphRAG Processing Info expander
+            # 2. GraphRAG Processing Info expander
             with st.expander("🔍 GraphRAG Processing Info", expanded=False):
                 # Mapped facts
                 st.markdown("**Qdrant-Mapped Initial Facts:**")
@@ -346,34 +419,32 @@ if user_input:
                 if known:
                     st.code(", ".join(known), language="text")
             
-            # Logical trace path
+            # 3. Logical trace path
             rule_ids = result.get("applied_rule_ids", [])
             if rule_ids:
                 trace_str = " → ".join(rule_ids)
                 st.markdown(f'<div class="trace-path">📋 Proof Path: {trace_str}</div>', unsafe_allow_html=True)
-                response_parts.append(f"**Proof Path:** `{trace_str}`")
             
-            # Rich LLM Explanation
+            # 4. Rich LLM Explanation (Live streaming)
             st.markdown("---")
+            explanation_str = ""
             trace_data = result.get("execution_trace", [])
             if trace_data:
-                with st.spinner("📝 Generating educational explanation..."):
-                    explanation = explain_proof(user_input, domain, trace_data, goal_reached)
-                if explanation:
-                    st.markdown(explanation)
-                    response_parts.append(explanation)
+                explanation_generator = explain_proof(user_msg, domain, trace_data, goal_reached)
+                explanation_str = st.write_stream(explanation_generator)
             else:
-                fallback_msg = (
+                explanation_str = (
                     "No inference steps were generated. The solver could not find a valid "
                     "proof path with the available rules. Try rephrasing your query or "
                     "ensuring the knowledge base is populated (`make embed-knowledge`)."
                 )
-                st.info(fallback_msg)
-                response_parts.append(fallback_msg)
+                st.info(explanation_str)
             
-            # Store response
+            # Save the complete result in the session state
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": "\n\n".join(response_parts),
-                "avatar": "🧠"
+                "avatar": "🧠",
+                "result": result,
+                "explanation": explanation_str
             })
+            st.rerun()
